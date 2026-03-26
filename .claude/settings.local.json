@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(winget upgrade:*)",
+      "Bash(npm install:*)",
+      "Bash(npx tsc:*)",
+      "Bash(npx next:*)",
+      "Bash(ls -la *.json *.mjs *.ts)",
+      "Bash(ls *.json *.mjs)",
+      "Bash(npm run:*)",
+      "Bash(npm audit:*)",
+      "Bash(echo \"EXIT:$?\")",
+      "Bash(node -e \"const p = require\\(''./node_modules/next/package.json''\\); console.log\\(''next version:'', p.version\\)\")"
+    ]
+  }
+}

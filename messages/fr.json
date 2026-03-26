@@ -8,11 +8,8 @@
   "nav": {
     "dashboard": "Tableau de bord",
     "clients": "Clients",
-    "campaigns": "Campagnes",
-    "pressReleases": "Communiqués",
     "journalists": "Journalistes",
     "inbox": "Boîte de réception",
-    "clippings": "Retombées presse",
     "improvements": "Amélioration continue",
     "settings": "Paramètres",
     "search": "Rechercher...",
@@ -71,7 +68,7 @@
     "gettingStartedDescription": "Suivez ces étapes pour configurer votre espace HPR.",
     "step1": "Ajouter votre premier client",
     "step2": "Importer vos journalistes",
-    "step3": "Créer une campagne"
+    "step3": "Créer une campagne depuis la fiche client"
   },
   "clients": {
     "title": "Clients",

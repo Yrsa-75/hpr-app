@@ -6,11 +6,8 @@ import { useTranslations, useLocale } from 'next-intl';
 import {
   LayoutDashboard,
   Users,
-  Megaphone,
-  FileText,
   UserSearch,
   Inbox,
-  Newspaper,
   RefreshCw,
   Settings,
   ChevronRight,
@@ -28,11 +25,8 @@ interface NavItem {
 const navItemDefs: NavItem[] = [
   { key: 'dashboard', path: '/dashboard', icon: LayoutDashboard },
   { key: 'clients', path: '/clients', icon: Users },
-  { key: 'campaigns', path: '/campaigns', icon: Megaphone },
-  { key: 'pressReleases', path: '/press-releases', icon: FileText },
   { key: 'journalists', path: '/journalists', icon: UserSearch },
   { key: 'inbox', path: '/inbox', icon: Inbox },
-  { key: 'clippings', path: '/clippings', icon: Newspaper },
   { key: 'improvements', path: '/improvements', icon: RefreshCw },
 ];
 

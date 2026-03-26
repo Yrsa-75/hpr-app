@@ -256,7 +256,7 @@ export default async function DashboardPage() {
               {[
                 { step: '1', label: t('step1'), href: '/fr/clients' },
                 { step: '2', label: t('step2'), href: '/fr/journalists' },
-                { step: '3', label: t('step3'), href: '/fr/campaigns' },
+                { step: '3', label: t('step3'), href: '/fr/clients' },
               ].map(({ step, label, href }) => (
                 <a
                   key={step}

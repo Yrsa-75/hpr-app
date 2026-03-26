@@ -14,11 +14,8 @@ const intlMiddleware = createMiddleware({
 const protectedPaths = [
   '/dashboard',
   '/clients',
-  '/campaigns',
-  '/press-releases',
   '/journalists',
   '/inbox',
-  '/clippings',
   '/improvements',
   '/settings',
 ];
