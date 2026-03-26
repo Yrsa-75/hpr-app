@@ -1,0 +1,115 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=Inter:wght@300;400;500;600&display=swap');
+
+@layer base {
+  :root {
+    /* Light mode - HPR */
+    --background: 60 9% 98%; /* #FAFAF9 */
+    --foreground: 240 10% 4%; /* Near black */
+    --card: 0 0% 100%;
+    --card-foreground: 240 10% 4%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 240 10% 4%;
+    --primary: 43 87% 37%; /* Gold #B8860B */
+    --primary-foreground: 60 9% 98%;
+    --secondary: 214 52% 24%; /* Blue night #1E3A5F */
+    --secondary-foreground: 60 9% 98%;
+    --muted: 210 40% 96.1%;
+    --muted-foreground: 215.4 16.3% 46.9%;
+    --accent: 43 87% 37%;
+    --accent-foreground: 60 9% 98%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
+    --ring: 43 87% 37%;
+    --radius: 0.5rem;
+  }
+
+  .dark {
+    /* Dark mode - HPR default */
+    --background: 240 10% 4%; /* #0A0A0B */
+    --foreground: 60 9% 98%; /* #FAFAF9 */
+    --card: 240 7% 8%;
+    --card-foreground: 60 9% 98%;
+    --popover: 240 7% 8%;
+    --popover-foreground: 60 9% 98%;
+    --primary: 43 87% 37%; /* Gold #B8860B */
+    --primary-foreground: 240 10% 4%;
+    --secondary: 214 52% 24%; /* Blue night #1E3A5F */
+    --secondary-foreground: 60 9% 98%;
+    --muted: 240 5% 15%;
+    --muted-foreground: 240 5% 65%;
+    --accent: 240 5% 15%;
+    --accent-foreground: 60 9% 98%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 240 5% 15%;
+    --input: 240 5% 15%;
+    --ring: 43 87% 37%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground font-sans;
+    font-feature-settings: 'rlig' 1, 'calt' 1;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-display;
+  }
+}
+
+@layer utilities {
+  .gold-border {
+    border-color: #B8860B;
+  }
+
+  .gold-text {
+    color: #B8860B;
+  }
+
+  .gold-bg {
+    background-color: #B8860B;
+  }
+
+  .gold-shimmer-hover:hover {
+    background-image: linear-gradient(90deg, transparent 0%, rgba(184, 134, 11, 0.15) 50%, transparent 100%);
+    background-size: 200% 100%;
+    animation: shimmer 2s linear infinite;
+  }
+
+  .text-gradient-gold {
+    background: linear-gradient(135deg, #B8860B 0%, #D4A017 50%, #B8860B 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(184, 134, 11, 0.3);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(184, 134, 11, 0.5);
+}
