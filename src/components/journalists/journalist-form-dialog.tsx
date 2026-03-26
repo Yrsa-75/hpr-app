@@ -40,7 +40,7 @@ const journalistFormSchema = z.object({
   phone: z.string().optional(),
   media_outlet: z.string().optional(),
   media_type: z
-    .enum(['presse_ecrite', 'tv', 'radio', 'web', 'podcast', 'blog', 'influenceur', ''])
+    .enum(['presse_ecrite', 'tv', 'radio', 'web', 'podcast', 'blog', 'influenceur', 'none'])
     .optional(),
   beat: z.string().optional(),
   location: z.string().optional(),
@@ -104,7 +104,7 @@ export function JournalistFormDialog({
       email: '',
       phone: '',
       media_outlet: '',
-      media_type: '',
+      media_type: 'none',
       beat: '',
       location: '',
       linkedin_url: '',
@@ -124,7 +124,7 @@ export function JournalistFormDialog({
         email: journalist?.email ?? '',
         phone: journalist?.phone ?? '',
         media_outlet: journalist?.media_outlet ?? '',
-        media_type: journalist?.media_type ?? '',
+        media_type: journalist?.media_type ?? 'none',
         beat: journalist?.beat?.join(', ') ?? '',
         location: journalist?.location ?? '',
         linkedin_url: journalist?.linkedin_url ?? '',
@@ -140,7 +140,8 @@ export function JournalistFormDialog({
     try {
       const formData = new FormData();
       Object.entries(values).forEach(([key, value]) => {
-        if (value !== undefined && value !== null) {
+        // 'none' is the UI placeholder for optional selects — skip it
+        if (value !== undefined && value !== null && value !== 'none') {
           formData.set(key, String(value));
         }
       });
@@ -277,7 +278,7 @@ export function JournalistFormDialog({
                   <SelectValue placeholder="Sélectionner un type" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Aucun</SelectItem>
+                  <SelectItem value="none">Aucun</SelectItem>
                   {MEDIA_TYPES.map((type) => (
                     <SelectItem key={type} value={type}>
                       {t(`media_types.${type}`)}
