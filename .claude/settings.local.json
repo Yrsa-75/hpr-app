@@ -10,7 +10,9 @@
       "Bash(npm run:*)",
       "Bash(npm audit:*)",
       "Bash(echo \"EXIT:$?\")",
-      "Bash(node -e \"const p = require\\(''./node_modules/next/package.json''\\); console.log\\(''next version:'', p.version\\)\")"
+      "Bash(node -e \"const p = require\\(''./node_modules/next/package.json''\\); console.log\\(''next version:'', p.version\\)\")",
+      "Bash(ls \"/c/Users/Julien Cotel/hpr-app/src/app/[locale]/\\(dashboard\\)/\")",
+      "Bash(cd:*)"
     ]
   }
 }
