@@ -43,6 +43,7 @@ const HPR_FIELDS = [
 ] as const;
 
 type HprFieldKey = typeof HPR_FIELDS[number]['key'];
+const IGNORE_VALUE = '__ignore__' as const;
 
 interface ImportResult {
   imported: number;
@@ -55,8 +56,8 @@ interface CsvImportDialogProps {
   onOpenChange: (open: boolean) => void;
 }
 
-function autoMap(csvColumns: string[]): Record<string, HprFieldKey | ''> {
-  const mapping: Record<string, HprFieldKey | ''> = {};
+function autoMap(csvColumns: string[]): Record<string, HprFieldKey | '__ignore__'> {
+  const mapping: Record<string, HprFieldKey | '__ignore__'> = {};
   const normalize = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '');
 
   const synonyms: Record<string, HprFieldKey> = {
@@ -105,7 +106,7 @@ function autoMap(csvColumns: string[]): Record<string, HprFieldKey | ''> {
 
   for (const col of csvColumns) {
     const key = normalize(col);
-    mapping[col] = synonyms[key] ?? '';
+    mapping[col] = synonyms[key] ?? IGNORE_VALUE;
   }
 
   return mapping;
@@ -121,7 +122,7 @@ export function CsvImportDialog({ open, onOpenChange }: CsvImportDialogProps) {
   const [fileName, setFileName] = React.useState('');
   const [csvColumns, setCsvColumns] = React.useState<string[]>([]);
   const [csvRows, setCsvRows] = React.useState<Record<string, string>[]>([]);
-  const [mapping, setMapping] = React.useState<Record<string, HprFieldKey | ''>>({});
+  const [mapping, setMapping] = React.useState<Record<string, HprFieldKey | '__ignore__'>>({});
   const [isImporting, setIsImporting] = React.useState(false);
   const [result, setResult] = React.useState<ImportResult | null>(null);
 
@@ -186,7 +187,7 @@ export function CsvImportDialog({ open, onOpenChange }: CsvImportDialogProps) {
     return csvRows.map((row) => {
       const journalist: Record<string, string> = {};
       for (const [csvCol, hprField] of Object.entries(mapping)) {
-        if (hprField && row[csvCol] !== undefined) {
+        if (hprField && hprField !== IGNORE_VALUE && row[csvCol] !== undefined) {
           journalist[hprField] = row[csvCol];
         }
       }
@@ -313,16 +314,16 @@ export function CsvImportDialog({ open, onOpenChange }: CsvImportDialogProps) {
                       {col}
                     </span>
                     <Select
-                      value={mapping[col] ?? ''}
+                      value={mapping[col] ?? IGNORE_VALUE}
                       onValueChange={(val) =>
-                        setMapping((prev) => ({ ...prev, [col]: val as HprFieldKey | '' }))
+                        setMapping((prev) => ({ ...prev, [col]: val as HprFieldKey | '__ignore__' }))
                       }
                     >
                       <SelectTrigger className="h-8 text-xs bg-white/[0.03] border-white/[0.08]">
                         <SelectValue placeholder="Ignorer" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="">Ignorer cette colonne</SelectItem>
+                        <SelectItem value={IGNORE_VALUE}>Ignorer cette colonne</SelectItem>
                         {HPR_FIELDS.map((field) => (
                           <SelectItem key={field.key} value={field.key}>
                             {field.label}{field.required ? ' *' : ''}
