@@ -138,6 +138,7 @@ export type Database = {
           last_name: string;
           email: string;
           phone: string | null;
+          phone_direct: string | null;
           media_outlet: string | null;
           media_type: 'presse_ecrite' | 'tv' | 'radio' | 'web' | 'podcast' | 'blog' | 'influenceur' | null;
           beat: string[] | null;
@@ -166,6 +167,7 @@ export type Database = {
           last_name: string;
           email: string;
           phone?: string | null;
+          phone_direct?: string | null;
           media_outlet?: string | null;
           media_type?: 'presse_ecrite' | 'tv' | 'radio' | 'web' | 'podcast' | 'blog' | 'influenceur' | null;
           beat?: string[] | null;
@@ -194,6 +196,7 @@ export type Database = {
           last_name?: string;
           email?: string;
           phone?: string | null;
+          phone_direct?: string | null;
           media_outlet?: string | null;
           media_type?: 'presse_ecrite' | 'tv' | 'radio' | 'web' | 'podcast' | 'blog' | 'influenceur' | null;
           beat?: string[] | null;

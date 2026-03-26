@@ -38,6 +38,7 @@ const journalistFormSchema = z.object({
   last_name: z.string().min(1, 'Le nom est obligatoire'),
   email: z.string().email('Email invalide'),
   phone: z.string().optional(),
+  phone_direct: z.string().optional(),
   media_outlet: z.string().optional(),
   media_type: z
     .enum(['presse_ecrite', 'tv', 'radio', 'web', 'podcast', 'blog', 'influenceur', 'none'])
@@ -103,6 +104,7 @@ export function JournalistFormDialog({
       last_name: '',
       email: '',
       phone: '',
+      phone_direct: '',
       media_outlet: '',
       media_type: 'none',
       beat: '',
@@ -123,6 +125,7 @@ export function JournalistFormDialog({
         last_name: journalist?.last_name ?? '',
         email: journalist?.email ?? '',
         phone: journalist?.phone ?? '',
+        phone_direct: journalist?.phone_direct ?? '',
         media_outlet: journalist?.media_outlet ?? '',
         media_type: journalist?.media_type ?? 'none',
         beat: journalist?.beat?.join(', ') ?? '',
@@ -241,6 +244,23 @@ export function JournalistFormDialog({
                 type="tel"
                 placeholder="ex : +33 6 00 00 00 00"
                 {...register('phone')}
+                className="bg-white/[0.03] border-white/[0.08] focus:border-hpr-gold/50"
+              />
+            </div>
+          </div>
+
+          {/* Row 2b: Téléphone ligne direct */}
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label htmlFor="phone_direct" className="text-sm text-foreground/80">
+                Téléphone (Ligne directe)
+                <span className="ml-1.5 text-xs text-muted-foreground">({tCommon('optional')})</span>
+              </Label>
+              <Input
+                id="phone_direct"
+                type="tel"
+                placeholder="ex : +33 1 00 00 00 00"
+                {...register('phone_direct')}
                 className="bg-white/[0.03] border-white/[0.08] focus:border-hpr-gold/50"
               />
             </div>
