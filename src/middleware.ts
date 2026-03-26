@@ -1,6 +1,6 @@
 import createMiddleware from 'next-intl/middleware';
+import { createServerClient } from '@supabase/ssr';
 import { type NextRequest, NextResponse } from 'next/server';
-import { updateSession } from '@/lib/supabase/middleware';
 
 const locales = ['fr'] as const;
 const defaultLocale = 'fr';
@@ -11,64 +11,88 @@ const intlMiddleware = createMiddleware({
   localePrefix: 'always',
 });
 
-const protectedRoutes = ['/dashboard', '/clients', '/campaigns', '/journalists', '/inbox', '/clippings', '/improvements', '/settings'];
+const protectedPaths = [
+  '/dashboard',
+  '/clients',
+  '/campaigns',
+  '/press-releases',
+  '/journalists',
+  '/inbox',
+  '/clippings',
+  '/improvements',
+  '/settings',
+];
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  // Handle next-intl locale routing first
-  const intlResponse = intlMiddleware(request);
+  // Strip locale prefix (e.g. /fr/dashboard → /dashboard)
+  const pathnameWithoutLocale =
+    pathname.replace(/^\/[a-z]{2}(\/|$)/, '/').replace(/\/$/, '') || '/';
 
-  // Determine the locale-stripped path for route matching
-  const pathnameWithoutLocale = pathname.replace(/^\/[a-z]{2}/, '') || '/';
-
-  // Check if the route is protected
-  const isProtectedRoute = protectedRoutes.some((route) =>
-    pathnameWithoutLocale.startsWith(route)
+  const isProtectedRoute = protectedPaths.some(
+    (path) =>
+      pathnameWithoutLocale === path ||
+      pathnameWithoutLocale.startsWith(path + '/')
   );
 
-  // Check if the route is an auth route
   const isAuthRoute =
-    pathnameWithoutLocale.startsWith('/login') ||
-    pathnameWithoutLocale.startsWith('/register');
+    pathnameWithoutLocale === '/login' ||
+    pathnameWithoutLocale === '/register';
 
-  // Update Supabase session
-  const supabaseResponse = await updateSession(request);
+  // Build response and Supabase client for session refresh
+  let response = NextResponse.next({ request });
 
-  // If session update resulted in a redirect, use that
-  if (supabaseResponse.status === 307 || supabaseResponse.status === 302) {
-    return supabaseResponse;
-  }
-
-  // Get the user from cookies
-  const supabaseCookies = supabaseResponse.cookies;
-
-  // Check auth state from cookies
-  const hasSession = request.cookies.getAll().some(
-    (cookie) => cookie.name.includes('auth-token') || cookie.name.includes('sb-')
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        getAll: () => request.cookies.getAll(),
+        setAll: (cookiesToSet) => {
+          cookiesToSet.forEach(({ name, value }) =>
+            request.cookies.set(name, value)
+          );
+          response = NextResponse.next({ request });
+          cookiesToSet.forEach(({ name, value, options }) =>
+            response.cookies.set(name, value, options)
+          );
+        },
+      },
+    }
   );
 
-  if (isProtectedRoute && !hasSession) {
-    const locale = pathname.split('/')[1] || defaultLocale;
-    const loginUrl = new URL(`/${locale}/login`, request.url);
-    loginUrl.searchParams.set('redirectTo', pathname);
-    return NextResponse.redirect(loginUrl);
+  // Verify session — this also refreshes expired tokens
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  const locale = pathname.split('/')[1] || defaultLocale;
+
+  // Unauthenticated → redirect to login
+  if (isProtectedRoute && !user) {
+    const url = new URL(`/${locale}/login`, request.url);
+    url.searchParams.set('redirectTo', pathname);
+    return NextResponse.redirect(url);
   }
 
-  if (isAuthRoute && hasSession) {
-    const locale = pathname.split('/')[1] || defaultLocale;
+  // Already authenticated → redirect away from auth pages
+  if (isAuthRoute && user) {
     return NextResponse.redirect(new URL(`/${locale}/dashboard`, request.url));
   }
 
-  // Copy cookies from supabase response to intl response
+  // Apply next-intl locale routing
+  const intlResponse = intlMiddleware(request);
+
+  // Forward session cookies to the intl response
   if (intlResponse) {
-    supabaseCookies.getAll().forEach((cookie) => {
+    response.cookies.getAll().forEach((cookie) => {
       intlResponse.cookies.set(cookie);
     });
     return intlResponse;
   }
 
-  return supabaseResponse;
+  return response;
 }
 
 export const config = {
