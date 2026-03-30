@@ -62,9 +62,10 @@ function formatDate(dateStr: string): string {
 
 interface ClientCardProps {
   client: ClientRow;
+  campaignCount?: number;
 }
 
-export function ClientCard({ client }: ClientCardProps) {
+export function ClientCard({ client, campaignCount = 0 }: ClientCardProps) {
   const t = useTranslations('clients');
   const tCommon = useTranslations('common');
   const locale = useLocale();
@@ -187,8 +188,7 @@ export function ClientCard({ client }: ClientCardProps) {
           {/* Footer: website + campaigns + date */}
           <div className="flex items-center justify-between pt-1 border-t border-white/[0.05]">
             <div className="flex items-center gap-3 text-xs text-muted-foreground">
-              {/* Campaign count (static for now) */}
-              <span>0 {t('campaigns')}</span>
+              <span>{campaignCount} {t('campaigns')}</span>
 
               {/* Website link */}
               {client.website && (

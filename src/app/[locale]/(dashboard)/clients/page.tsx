@@ -6,6 +6,8 @@ import { ClientCard } from '@/components/clients/client-card';
 import { ClientsHeader } from '@/components/clients/clients-header';
 import type { ClientRow } from '@/types/database';
 
+export type ClientWithCampaignCount = ClientRow & { campaign_count: number };
+
 export async function generateMetadata(): Promise<Metadata> {
   const t = await getTranslations('clients');
   return { title: t('title') };
@@ -20,7 +22,7 @@ export default async function ClientsPage() {
     data: { user },
   } = await supabase.auth.getUser();
 
-  let clients: ClientRow[] = [];
+  let clients: ClientWithCampaignCount[] = [];
 
   if (user) {
     const { data: profile } = await supabase
@@ -32,11 +34,14 @@ export default async function ClientsPage() {
     if (profile?.organization_id) {
       const { data } = await supabase
         .from('clients')
-        .select('*')
+        .select('*, campaigns(count)')
         .eq('organization_id', profile.organization_id)
         .order('created_at', { ascending: false });
 
-      clients = data ?? [];
+      clients = (data ?? []).map((c) => ({
+        ...c,
+        campaign_count: (c.campaigns as unknown as { count: number }[])[0]?.count ?? 0,
+      }));
     }
   }
 
@@ -47,7 +52,7 @@ export default async function ClientsPage() {
       {clients && clients.length > 0 ? (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
           {clients.map((client) => (
-            <ClientCard key={client.id} client={client} />
+            <ClientCard key={client.id} client={client} campaignCount={client.campaign_count} />
           ))}
         </div>
       ) : (
