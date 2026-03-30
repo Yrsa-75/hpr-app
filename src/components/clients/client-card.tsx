@@ -154,7 +154,7 @@ export function ClientCard({ client }: ClientCardProps) {
               <img
                 src={client.logo_url}
                 alt={client.name}
-                className="h-10 w-10 rounded-lg object-cover flex-shrink-0"
+                className="max-w-[100px] w-auto h-auto max-h-12 object-contain flex-shrink-0"
               />
             ) : (
               <div

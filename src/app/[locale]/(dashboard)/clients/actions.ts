@@ -178,6 +178,7 @@ export async function createClientAction(
     await supabase
       .from('clients')
       .update({
+        logo_url: signatureLogoUrl,
         signature_logo_url: signatureLogoUrl,
         email_signature_html: signatureHtml,
       })
@@ -249,6 +250,7 @@ export async function updateClientAction(
       sender_name: parsed.data.sender_name ?? null,
       sender_email: parsed.data.sender_email ?? null,
       signature_text: parsed.data.signature_text ?? null,
+      logo_url: signatureLogoUrl,
       signature_logo_url: signatureLogoUrl,
       email_signature_html: signatureHtml,
     })
