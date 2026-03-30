@@ -4,8 +4,8 @@ import Link from 'next/link';
 import { ArrowLeft, Calendar, Clock } from 'lucide-react';
 import { createClient } from '@/lib/supabase/server';
 import { CampaignTabs } from '@/components/campaigns/campaign-tabs';
-import { PressReleaseEditor } from '@/components/campaigns/press-release-editor';
-import type { CampaignRow, PressReleaseRow } from '@/types/database';
+import type { CampaignRow, PressReleaseRow, JournalistRow } from '@/types/database';
+import type { EmailSendWithJoins } from '@/components/campaigns/sending-tab';
 import { cn } from '@/lib/utils';
 
 type CampaignStatus = CampaignRow['status'];
@@ -78,14 +78,14 @@ export default async function CampaignDetailPage({
     return notFound();
   }
 
-  // Fetch client name
+  // Fetch client (with sender info)
   const { data: clientData } = await supabase
     .from('clients')
-    .select('name')
+    .select('name, sender_name, sender_email')
     .eq('id', clientId)
     .single();
 
-  // Fetch current press release (is_current = true)
+  // Fetch current press release
   const { data: pressRelease } = await supabase
     .from('press_releases')
     .select('*')
@@ -94,6 +94,22 @@ export default async function CampaignDetailPage({
     .order('version', { ascending: false })
     .limit(1)
     .maybeSingle();
+
+  // Fetch org journalists (for targeting)
+  const { data: journalists } = await supabase
+    .from('journalists')
+    .select('*')
+    .eq('is_opted_out', false)
+    .order('last_name', { ascending: true });
+
+  // Fetch email_sends for this campaign (with journalist + press release info)
+  const { data: emailSends } = await supabase
+    .from('email_sends')
+    .select('*, journalists(first_name, last_name, email, media_outlet), press_releases(title)')
+    .eq('campaign_id', campaignId)
+    .order('sent_at', { ascending: false });
+
+  const selectedJournalistIds = (emailSends ?? []).map((s: { journalist_id: string }) => s.journalist_id);
 
   const statusConfig = getStatusConfig(campaign.status);
   const formattedDate = formatDate(campaign.target_date);
@@ -159,7 +175,7 @@ export default async function CampaignDetailPage({
         {/* Tags */}
         {campaign.tags && campaign.tags.length > 0 && (
           <div className="flex flex-wrap gap-1.5">
-            {campaign.tags.map((tag) => (
+            {campaign.tags.map((tag: string) => (
               <span
                 key={tag}
                 className="inline-block bg-white/5 text-muted-foreground text-xs px-2 py-0.5 rounded-full border border-white/[0.06]"
@@ -176,6 +192,14 @@ export default async function CampaignDetailPage({
         campaignId={campaignId}
         clientId={clientId}
         pressRelease={pressRelease as PressReleaseRow | null}
+        journalists={(journalists ?? []) as JournalistRow[]}
+        selectedJournalistIds={selectedJournalistIds}
+        emailSends={(emailSends ?? []) as unknown as EmailSendWithJoins[]}
+        client={{
+          name: clientData?.name ?? '',
+          sender_name: clientData?.sender_name ?? null,
+          sender_email: clientData?.sender_email ?? null,
+        }}
       />
     </div>
   );

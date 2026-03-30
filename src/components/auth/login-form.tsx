@@ -82,7 +82,7 @@ export function LoginForm() {
             {t('password')}
           </Label>
           <a
-            href="#"
+            href="/fr/forgot-password"
             className="text-xs text-hpr-gold hover:text-hpr-gold-light transition-colors"
           >
             {t('forgotPassword')}

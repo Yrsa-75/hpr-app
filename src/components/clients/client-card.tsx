@@ -1,7 +1,8 @@
 'use client';
 
 import * as React from 'react';
-import { useTranslations } from 'next-intl';
+import { useRouter } from 'next/navigation';
+import { useTranslations, useLocale } from 'next-intl';
 import { ExternalLink, MoreHorizontal, Pencil, Trash2 } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 import { Button } from '@/components/ui/button';
@@ -66,6 +67,8 @@ interface ClientCardProps {
 export function ClientCard({ client }: ClientCardProps) {
   const t = useTranslations('clients');
   const tCommon = useTranslations('common');
+  const locale = useLocale();
+  const router = useRouter();
   const { toast } = useToast();
 
   const [editOpen, setEditOpen] = React.useState(false);
@@ -99,9 +102,15 @@ export function ClientCard({ client }: ClientCardProps) {
 
   return (
     <>
-      <div className="group relative border border-white/[0.08] bg-white/[0.02] rounded-xl p-5 hover:border-white/15 hover:bg-white/[0.04] transition-all duration-200">
+      <div
+        role="button"
+        tabIndex={0}
+        onClick={() => router.push(`/${locale}/clients/${client.id}`)}
+        onKeyDown={(e) => e.key === 'Enter' && router.push(`/${locale}/clients/${client.id}`)}
+        className="cursor-pointer group relative border border-white/[0.08] bg-white/[0.02] rounded-xl p-5 hover:border-white/15 hover:bg-white/[0.04] transition-all duration-200"
+      >
         {/* Actions dropdown */}
-        <div className="absolute top-4 right-4">
+        <div className="absolute top-4 right-4" onClick={(e) => e.stopPropagation()}>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button
@@ -188,7 +197,7 @@ export function ClientCard({ client }: ClientCardProps) {
                   target="_blank"
                   rel="noopener noreferrer"
                   className="flex items-center gap-1 text-muted-foreground hover:text-hpr-gold transition-colors"
-                  onClick={(e) => e.stopPropagation()}
+                  onClick={(e) => { e.stopPropagation(); }}
                 >
                   <ExternalLink className="h-3 w-3" />
                   <span>Site</span>

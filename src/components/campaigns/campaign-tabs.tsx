@@ -5,12 +5,25 @@ import { useTranslations } from 'next-intl';
 import { Construction } from 'lucide-react';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { PressReleaseEditor } from '@/components/campaigns/press-release-editor';
-import type { PressReleaseRow } from '@/types/database';
+import { TargetingTab } from '@/components/campaigns/targeting-tab';
+import { SendingTab, type EmailSendWithJoins } from '@/components/campaigns/sending-tab';
+import { TrackingTab } from '@/components/campaigns/tracking-tab';
+import type { PressReleaseRow, JournalistRow } from '@/types/database';
+
+interface ClientInfo {
+  name: string;
+  sender_name: string | null;
+  sender_email: string | null;
+}
 
 interface CampaignTabsProps {
   campaignId: string;
   clientId: string;
   pressRelease: PressReleaseRow | null;
+  journalists: JournalistRow[];
+  selectedJournalistIds: string[];
+  emailSends: EmailSendWithJoins[];
+  client: ClientInfo;
 }
 
 function ComingSoonTab({ label }: { label: string }) {
@@ -29,14 +42,34 @@ function ComingSoonTab({ label }: { label: string }) {
   );
 }
 
-export function CampaignTabs({ campaignId, clientId, pressRelease }: CampaignTabsProps) {
+export function CampaignTabs({
+  campaignId,
+  clientId,
+  pressRelease,
+  journalists,
+  selectedJournalistIds,
+  emailSends,
+  client,
+}: CampaignTabsProps) {
   const t = useTranslations('campaigns');
+
+  // Local count synced from TargetingTab via callback
+  const [targetCount, setTargetCount] = React.useState(
+    selectedJournalistIds.length
+  );
 
   return (
     <Tabs defaultValue="pressRelease" className="w-full">
       <TabsList className="w-full justify-start overflow-x-auto">
         <TabsTrigger value="pressRelease">{t('tabs.pressRelease')}</TabsTrigger>
-        <TabsTrigger value="targeting">{t('tabs.targeting')}</TabsTrigger>
+        <TabsTrigger value="targeting">
+          {t('tabs.targeting')}
+          {targetCount > 0 && (
+            <span className="ml-1.5 text-[10px] bg-hpr-gold/20 text-hpr-gold px-1.5 py-0 rounded-full">
+              {targetCount}
+            </span>
+          )}
+        </TabsTrigger>
         <TabsTrigger value="sending">{t('tabs.sending')}</TabsTrigger>
         <TabsTrigger value="tracking">{t('tabs.tracking')}</TabsTrigger>
         <TabsTrigger value="replies">{t('tabs.replies')}</TabsTrigger>
@@ -52,15 +85,26 @@ export function CampaignTabs({ campaignId, clientId, pressRelease }: CampaignTab
       </TabsContent>
 
       <TabsContent value="targeting">
-        <ComingSoonTab label={t('tabs.targeting')} />
+        <TargetingTab
+          campaignId={campaignId}
+          journalists={journalists}
+          initialSelectedIds={selectedJournalistIds}
+          pressReleaseId={pressRelease?.id ?? null}
+          onCountChange={setTargetCount}
+        />
       </TabsContent>
 
       <TabsContent value="sending">
-        <ComingSoonTab label={t('tabs.sending')} />
+        <SendingTab
+          campaignId={campaignId}
+          pressRelease={pressRelease}
+          emailSends={emailSends}
+          client={client}
+        />
       </TabsContent>
 
       <TabsContent value="tracking">
-        <ComingSoonTab label={t('tabs.tracking')} />
+        <TrackingTab emailSends={emailSends} />
       </TabsContent>
 
       <TabsContent value="replies">

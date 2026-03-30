@@ -6,7 +6,8 @@ import { Loader2, Save, Sparkles, Send, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
+import { RichEditor } from '@/components/campaigns/rich-editor';
+import { DiffPreviewDialog } from '@/components/campaigns/diff-preview-dialog';
 import { useToast } from '@/components/ui/use-toast';
 import {
   savePressReleaseAction,
@@ -132,7 +133,18 @@ export function PressReleaseEditor({ campaignId, initialPressRelease }: PressRel
   });
   const [isAnalyzing, setIsAnalyzing] = React.useState(false);
   const [isSaving, setIsSaving] = React.useState(false);
-  const [isRewriting, setIsRewriting] = React.useState(false);
+  const [rewritingIndex, setRewritingIndex] = React.useState<number | null>(null);
+  const [isChatRewriting, setIsChatRewriting] = React.useState(false);
+
+  // Diff preview state
+  const [diffDialog, setDiffDialog] = React.useState<{
+    open: boolean;
+    suggestion: string;
+    index: number;
+    oldHtml: string;
+    newHtml: string;
+    isApplying: boolean;
+  }>({ open: false, suggestion: '', index: -1, oldHtml: '', newHtml: '', isApplying: false });
   const [chatInput, setChatInput] = React.useState('');
   const [chatHistory, setChatHistory] = React.useState<ChatMessage[]>([]);
   const [lastSaved, setLastSaved] = React.useState<Date | null>(null);
@@ -158,14 +170,14 @@ export function PressReleaseEditor({ campaignId, initialPressRelease }: PressRel
     };
   }, [emailSubject, title, subtitle, bodyHtml, emailPreviewText, triggerAutoSave]);
 
-  const handleSave = async (silent = false) => {
+  const handleSave = async (silent = false, bodyOverride?: string) => {
     if (!silent) setIsSaving(true);
     try {
       const formData = new FormData();
       formData.set('email_subject', emailSubject);
       formData.set('title', title || 'Sans titre');
       formData.set('subtitle', subtitle);
-      formData.set('body_html', bodyHtml);
+      formData.set('body_html', bodyOverride ?? bodyHtml);
       formData.set('email_preview_text', emailPreviewText);
       if (pressReleaseId) {
         formData.set('press_release_id', pressReleaseId);
@@ -189,19 +201,18 @@ export function PressReleaseEditor({ campaignId, initialPressRelease }: PressRel
   };
 
   const handleAnalyze = async () => {
-    if (!pressReleaseId) {
-      // Save first
-      await handleSave(false);
-      toast({
-        title: 'Info',
-        description: 'Communiqué enregistré. Lancez l\'analyse à nouveau.',
-      });
+    // Always save first so analysis uses the latest content
+    await handleSave(true);
+
+    const idToAnalyze = pressReleaseId;
+    if (!idToAnalyze) {
+      toast({ title: tCommon('error'), description: 'Enregistrez d\'abord le communiqué.', variant: 'destructive' });
       return;
     }
 
     setIsAnalyzing(true);
     try {
-      const result = await analyzePressReleaseAction(pressReleaseId);
+      const result = await analyzePressReleaseAction(idToAnalyze);
       if (result.success && result.scores) {
         setScores(result.scores);
         toast({ title: tCommon('success'), description: 'Analyse IA terminée.' });
@@ -213,24 +224,55 @@ export function PressReleaseEditor({ campaignId, initialPressRelease }: PressRel
     }
   };
 
-  const handleApplySuggestion = async (suggestion: string) => {
-    const currentContent = [title, subtitle, bodyHtml].filter(Boolean).join('\n\n');
-    if (!currentContent.trim()) {
+  const handleApplySuggestion = async (suggestion: string, index: number) => {
+    if (!bodyHtml.trim()) {
       toast({ title: tCommon('error'), description: 'Aucun contenu à réécrire.', variant: 'destructive' });
       return;
     }
 
-    setIsRewriting(true);
+    setRewritingIndex(index);
     try {
-      const result = await rewriteSectionAction(suggestion, bodyHtml || currentContent);
+      const result = await rewriteSectionAction(suggestion, bodyHtml);
       if (result.success && result.content) {
-        setBodyHtml(result.content);
-        toast({ title: tCommon('success'), description: 'Suggestion appliquée.' });
+        // Show diff dialog instead of applying immediately
+        setDiffDialog({
+          open: true,
+          suggestion,
+          index,
+          oldHtml: bodyHtml,
+          newHtml: result.content,
+          isApplying: false,
+        });
       } else {
         toast({ title: tCommon('error'), description: result.error, variant: 'destructive' });
       }
     } finally {
-      setIsRewriting(false);
+      setRewritingIndex(null);
+    }
+  };
+
+  const handleConfirmDiff = async () => {
+    const { newHtml, index } = diffDialog;
+    setDiffDialog((prev) => ({ ...prev, isApplying: true }));
+    try {
+      setBodyHtml(newHtml);
+      setScores((prev) =>
+        prev ? { ...prev, suggestions: prev.suggestions.filter((_, i) => i !== index) } : prev
+      );
+      await handleSave(true, newHtml);
+      setDiffDialog((prev) => ({ ...prev, open: false }));
+      // Re-analyze
+      if (pressReleaseId) {
+        setIsAnalyzing(true);
+        try {
+          const analysis = await analyzePressReleaseAction(pressReleaseId);
+          if (analysis.success && analysis.scores) setScores(analysis.scores);
+        } finally {
+          setIsAnalyzing(false);
+        }
+      }
+    } finally {
+      setDiffDialog((prev) => ({ ...prev, isApplying: false }));
     }
   };
 
@@ -241,31 +283,19 @@ export function PressReleaseEditor({ campaignId, initialPressRelease }: PressRel
     setChatInput('');
     setChatHistory((prev) => [...prev, { role: 'user', content: userMessage }]);
 
-    setIsRewriting(true);
+    setIsChatRewriting(true);
     try {
       const currentContent = bodyHtml || [title, subtitle].filter(Boolean).join('\n\n') || 'Contenu vide';
       const result = await rewriteSectionAction(userMessage, currentContent);
 
       if (result.success && result.content) {
         setBodyHtml(result.content);
-        setChatHistory((prev) => [
-          ...prev,
-          {
-            role: 'assistant',
-            content: 'Contenu mis à jour selon votre instruction.',
-          },
-        ]);
+        setChatHistory((prev) => [...prev, { role: 'assistant', content: 'Contenu mis à jour selon votre instruction.' }]);
       } else {
-        setChatHistory((prev) => [
-          ...prev,
-          {
-            role: 'assistant',
-            content: result.error ?? 'Une erreur s\'est produite.',
-          },
-        ]);
+        setChatHistory((prev) => [...prev, { role: 'assistant', content: result.error ?? 'Une erreur s\'est produite.' }]);
       }
     } finally {
-      setIsRewriting(false);
+      setIsChatRewriting(false);
     }
   };
 
@@ -344,12 +374,11 @@ export function PressReleaseEditor({ campaignId, initialPressRelease }: PressRel
           <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
             {t('body')}
           </Label>
-          <Textarea
-            placeholder={t('noContent')}
+          <RichEditor
             value={bodyHtml}
-            onChange={(e) => setBodyHtml(e.target.value)}
-            className="bg-white/[0.03] border-white/[0.08] focus:border-hpr-gold/50 resize-none font-mono text-sm leading-relaxed"
-            style={{ minHeight: '400px' }}
+            onChange={setBodyHtml}
+            placeholder={t('noContent')}
+            minHeight={400}
           />
         </div>
 
@@ -436,14 +465,14 @@ export function PressReleaseEditor({ campaignId, initialPressRelease }: PressRel
                   <Button
                     size="sm"
                     variant="ghost"
-                    onClick={() => handleApplySuggestion(suggestion)}
-                    disabled={isRewriting}
+                    onClick={() => handleApplySuggestion(suggestion, i)}
+                    disabled={rewritingIndex !== null}
                     className="h-6 text-[11px] text-hpr-gold/70 hover:text-hpr-gold hover:bg-hpr-gold/5 px-2"
                   >
-                    {isRewriting ? (
+                    {rewritingIndex === i ? (
                       <Loader2 className="h-3 w-3 animate-spin mr-1" />
                     ) : null}
-                    Appliquer
+                    {rewritingIndex === i ? 'Application...' : 'Appliquer'}
                   </Button>
                 </div>
               ))}
@@ -486,17 +515,17 @@ export function PressReleaseEditor({ campaignId, initialPressRelease }: PressRel
                   handleChat();
                 }
               }}
-              disabled={isRewriting}
+              disabled={isChatRewriting}
               className="flex-1 min-w-0 bg-white/[0.03] border border-white/[0.08] rounded-lg px-3 py-2 text-xs text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:border-hpr-gold/50 disabled:opacity-50"
             />
             <Button
               size="sm"
               variant="ghost"
               onClick={handleChat}
-              disabled={isRewriting || !chatInput.trim()}
+              disabled={isChatRewriting || !chatInput.trim()}
               className="h-9 w-9 p-0 text-muted-foreground hover:text-hpr-gold hover:bg-hpr-gold/5 shrink-0"
             >
-              {isRewriting ? (
+              {isChatRewriting ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
               ) : (
                 <Send className="h-4 w-4" />
@@ -505,6 +534,16 @@ export function PressReleaseEditor({ campaignId, initialPressRelease }: PressRel
           </div>
         </div>
       </div>
+
+      <DiffPreviewDialog
+        open={diffDialog.open}
+        onOpenChange={(open) => setDiffDialog((prev) => ({ ...prev, open }))}
+        suggestion={diffDialog.suggestion}
+        oldHtml={diffDialog.oldHtml}
+        newHtml={diffDialog.newHtml}
+        onConfirm={handleConfirmDiff}
+        isApplying={diffDialog.isApplying}
+      />
     </div>
   );
 }

@@ -21,7 +21,20 @@ const protectedPaths = [
 ];
 
 export async function middleware(request: NextRequest) {
-  const { pathname } = request.nextUrl;
+  const { pathname, searchParams, origin } = request.nextUrl;
+
+  // Forward Supabase auth codes (from password reset / magic link emails) to the callback handler
+  const code = searchParams.get('code');
+  if (code && !pathname.startsWith('/api/auth/')) {
+    const callbackUrl = new URL('/api/auth/callback', origin);
+    callbackUrl.searchParams.set('code', code);
+    // If this looks like a recovery flow (came from root or reset-password path), keep destination
+    const isRecovery = pathname === '/' || pathname.match(/^\/[a-z]{2}(\/reset-password)?$/);
+    if (isRecovery) {
+      callbackUrl.searchParams.set('next', '/fr/reset-password');
+    }
+    return NextResponse.redirect(callbackUrl);
+  }
 
   // Strip locale prefix (e.g. /fr/dashboard → /dashboard)
   const pathnameWithoutLocale =
@@ -94,6 +107,6 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+    '/((?!_next/static|_next/image|favicon.ico|api/|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
   ],
 };

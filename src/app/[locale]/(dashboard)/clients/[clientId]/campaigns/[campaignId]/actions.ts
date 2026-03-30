@@ -168,7 +168,7 @@ Réponds UNIQUEMENT en JSON avec ce format exact :
 }`;
 
     const message = await anthropic.messages.create({
-      model: 'claude-opus-4-5',
+      model: 'claude-haiku-4-5-20251001',
       max_tokens: 1024,
       messages: [{ role: 'user', content: prompt }],
     });
@@ -245,7 +245,7 @@ Contenu actuel: ${currentContent}
 Réponds UNIQUEMENT avec le contenu réécrit, sans commentaire.`;
 
     const message = await anthropic.messages.create({
-      model: 'claude-opus-4-5',
+      model: 'claude-haiku-4-5-20251001',
       max_tokens: 2048,
       messages: [{ role: 'user', content: prompt }],
     });

@@ -498,6 +498,127 @@ export type Database = {
           },
         ];
       };
+      email_sends: {
+        Row: {
+          id: string;
+          campaign_id: string;
+          press_release_id: string;
+          journalist_id: string;
+          resend_email_id: string | null;
+          status: 'queued' | 'sent' | 'delivered' | 'opened' | 'clicked' | 'bounced' | 'complained' | 'failed';
+          sent_at: string | null;
+          opened_at: string | null;
+          clicked_at: string | null;
+          bounced_at: string | null;
+          personalized_subject: string | null;
+          personalized_intro: string | null;
+          ab_variant: 'A' | 'B' | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          campaign_id: string;
+          press_release_id: string;
+          journalist_id: string;
+          resend_email_id?: string | null;
+          status?: 'queued' | 'sent' | 'delivered' | 'opened' | 'clicked' | 'bounced' | 'complained' | 'failed';
+          sent_at?: string | null;
+          opened_at?: string | null;
+          clicked_at?: string | null;
+          bounced_at?: string | null;
+          personalized_subject?: string | null;
+          personalized_intro?: string | null;
+          ab_variant?: 'A' | 'B' | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          campaign_id?: string;
+          press_release_id?: string;
+          journalist_id?: string;
+          resend_email_id?: string | null;
+          status?: 'queued' | 'sent' | 'delivered' | 'opened' | 'clicked' | 'bounced' | 'complained' | 'failed';
+          sent_at?: string | null;
+          opened_at?: string | null;
+          clicked_at?: string | null;
+          bounced_at?: string | null;
+          personalized_subject?: string | null;
+          personalized_intro?: string | null;
+          ab_variant?: 'A' | 'B' | null;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      email_threads: {
+        Row: {
+          id: string;
+          campaign_id: string;
+          journalist_id: string;
+          email_send_id: string | null;
+          status: 'new' | 'needs_response' | 'responded' | 'follow_up_scheduled' | 'closed' | 'positive' | 'negative';
+          sentiment: 'positive' | 'neutral' | 'negative' | 'interested' | 'not_interested' | null;
+          ai_suggested_response: string | null;
+          ai_response_strategy: string | null;
+          priority_score: number | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          campaign_id: string;
+          journalist_id: string;
+          email_send_id?: string | null;
+          status?: 'new' | 'needs_response' | 'responded' | 'follow_up_scheduled' | 'closed' | 'positive' | 'negative';
+          sentiment?: 'positive' | 'neutral' | 'negative' | 'interested' | 'not_interested' | null;
+          ai_suggested_response?: string | null;
+          ai_response_strategy?: string | null;
+          priority_score?: number | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          status?: 'new' | 'needs_response' | 'responded' | 'follow_up_scheduled' | 'closed' | 'positive' | 'negative';
+          sentiment?: 'positive' | 'neutral' | 'negative' | 'interested' | 'not_interested' | null;
+          ai_suggested_response?: string | null;
+          ai_response_strategy?: string | null;
+          priority_score?: number | null;
+          updated_at?: string;
+        };
+      };
+      email_messages: {
+        Row: {
+          id: string;
+          thread_id: string;
+          direction: 'inbound' | 'outbound';
+          from_email: string | null;
+          to_email: string | null;
+          subject: string | null;
+          body_html: string | null;
+          body_plain: string | null;
+          is_auto_reply: boolean;
+          resend_inbound_id: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          thread_id: string;
+          direction: 'inbound' | 'outbound';
+          from_email?: string | null;
+          to_email?: string | null;
+          subject?: string | null;
+          body_html?: string | null;
+          body_plain?: string | null;
+          is_auto_reply?: boolean;
+          resend_inbound_id?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          body_html?: string | null;
+          body_plain?: string | null;
+          is_auto_reply?: boolean;
+          resend_inbound_id?: string | null;
+        };
+      };
     };
     Views: Record<string, {
       Row: Record<string, unknown>;
@@ -547,3 +668,16 @@ export type PressClippingUpdate = Database['public']['Tables']['press_clippings'
 export type NotificationRow = Database['public']['Tables']['notifications']['Row'];
 export type NotificationInsert = Database['public']['Tables']['notifications']['Insert'];
 export type NotificationUpdate = Database['public']['Tables']['notifications']['Update'];
+
+export type EmailSendRow = Database['public']['Tables']['email_sends']['Row'];
+export type EmailSendInsert = Database['public']['Tables']['email_sends']['Insert'];
+export type EmailSendUpdate = Database['public']['Tables']['email_sends']['Update'];
+export type EmailSendStatus = EmailSendRow['status'];
+
+export type EmailThreadRow = Database['public']['Tables']['email_threads']['Row'];
+export type EmailThreadInsert = Database['public']['Tables']['email_threads']['Insert'];
+export type EmailThreadUpdate = Database['public']['Tables']['email_threads']['Update'];
+export type EmailThreadStatus = EmailThreadRow['status'];
+
+export type EmailMessageRow = Database['public']['Tables']['email_messages']['Row'];
+export type EmailMessageInsert = Database['public']['Tables']['email_messages']['Insert'];
