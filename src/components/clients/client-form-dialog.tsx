@@ -56,6 +56,11 @@ export function ClientFormDialog({ open, onOpenChange, client }: ClientFormDialo
   const tCommon = useTranslations('common');
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = React.useState(false);
+  // Client logo (avatar on card)
+  const [clientLogoFile, setClientLogoFile] = React.useState<File | null>(null);
+  const [clientLogoPreview, setClientLogoPreview] = React.useState<string | null>(null);
+  const clientLogoInputRef = React.useRef<HTMLInputElement>(null);
+  // Signature logo
   const [logoFile, setLogoFile] = React.useState<File | null>(null);
   const [logoPreview, setLogoPreview] = React.useState<string | null>(null);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
@@ -367,7 +372,7 @@ export function ClientFormDialog({ open, onOpenChange, client }: ClientFormDialo
                     {logoPreview && (
                       <td style={{ paddingRight: 14, verticalAlign: 'middle' }}>
                         {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src={logoPreview} alt="Logo" style={{ height: 48, width: 'auto', display: 'block' }} />
+                        <img src={logoPreview} alt="Logo" style={{ maxWidth: 150, width: 'auto', height: 'auto', display: 'block' }} />
                       </td>
                     )}
                     {signatureLines.length > 0 && (

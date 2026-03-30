@@ -98,7 +98,7 @@ function buildSignatureHtml(logoUrl: string | null, signatureText: string | null
     return `<table cellpadding="0" cellspacing="0" border="0" style="font-family:Arial,sans-serif;">
   <tr>
     <td style="padding-right:14px;vertical-align:middle;">
-      <img src="${logoUrl}" alt="Logo" style="height:48px;width:auto;display:block;" />
+      <img src="${logoUrl}" alt="Logo" style="max-width:150px;width:auto;height:auto;display:block;" />
     </td>
     <td style="border-left:2px solid #B8860B;padding-left:14px;vertical-align:middle;">
       ${textHtml}
@@ -108,7 +108,7 @@ function buildSignatureHtml(logoUrl: string | null, signatureText: string | null
   }
 
   if (logoUrl) {
-    return `<img src="${logoUrl}" alt="Logo" style="height:48px;width:auto;display:block;" />`;
+    return `<img src="${logoUrl}" alt="Logo" style="max-width:150px;width:auto;height:auto;display:block;" />`;
   }
 
   return `<div style="font-family:Arial,sans-serif;">${textHtml}</div>`;
