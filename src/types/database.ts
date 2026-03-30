@@ -89,6 +89,8 @@ export type Database = {
           sender_name: string | null;
           sender_email: string | null;
           email_signature_html: string | null;
+          signature_logo_url: string | null;
+          signature_text: string | null;
           settings: Json;
           created_at: string;
         };
@@ -103,6 +105,8 @@ export type Database = {
           sender_name?: string | null;
           sender_email?: string | null;
           email_signature_html?: string | null;
+          signature_logo_url?: string | null;
+          signature_text?: string | null;
           settings?: Json;
           created_at?: string;
         };
@@ -117,6 +121,8 @@ export type Database = {
           sender_name?: string | null;
           sender_email?: string | null;
           email_signature_html?: string | null;
+          signature_logo_url?: string | null;
+          signature_text?: string | null;
           settings?: Json;
           created_at?: string;
         };
