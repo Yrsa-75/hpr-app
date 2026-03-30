@@ -115,7 +115,6 @@ function ThreadListItem({
         </span>
       </div>
       <div className="ml-4 mt-1 space-y-1">
-        <p className="text-xs text-muted-foreground/60 truncate">{thread.campaigns?.name}</p>
         {preview && (
           <p className="text-xs text-muted-foreground/50 truncate">{preview}</p>
         )}
@@ -462,31 +461,60 @@ export function InboxView({ threads }: InboxViewProps) {
           ))}
         </div>
 
-        {/* Thread list */}
+        {/* Thread list grouped by campaign */}
         <div className="flex-1 overflow-y-auto">
           {filtered.length === 0 ? (
             <div className="text-center py-8 text-xs text-muted-foreground">
               Aucun fil dans cette catégorie.
             </div>
           ) : (
-            filtered.map((thread) => (
-              <ThreadListItem
-                key={thread.id}
-                thread={thread}
-                selected={thread.id === selected?.id}
-                isRead={readIds.has(thread.id) || thread.status !== 'new'}
-                onClick={() => {
-                  setSelectedId(thread.id);
-                  setShowDetail(true);
-                  if (thread.status === 'new' && !readIds.has(thread.id)) {
-                    setReadIds((prev) => new Set([...prev, thread.id]));
-                    startTransition(() => {
-                      updateThreadStatusAction(thread.id, 'needs_response');
-                    });
-                  }
-                }}
-              />
-            ))
+            (() => {
+              // Group threads by campaign
+              const groups = new Map<string, { campaignName: string; clientName: string | null; threads: typeof filtered }>();
+              for (const thread of filtered) {
+                const key = thread.campaign_id ?? 'unknown';
+                if (!groups.has(key)) {
+                  groups.set(key, {
+                    campaignName: thread.campaigns?.name ?? 'Campagne inconnue',
+                    clientName: thread.campaigns?.clients?.name ?? null,
+                    threads: [],
+                  });
+                }
+                groups.get(key)!.threads.push(thread);
+              }
+
+              return Array.from(groups.entries()).map(([campaignId, group]) => (
+                <div key={campaignId}>
+                  {/* Campaign header */}
+                  <div className="px-4 py-2 border-b border-white/[0.04] bg-white/[0.02] sticky top-0 z-10">
+                    <p className="text-[11px] font-semibold text-foreground/70 truncate">
+                      {group.campaignName}
+                    </p>
+                    {group.clientName && (
+                      <p className="text-[10px] text-hpr-gold/60 truncate">{group.clientName}</p>
+                    )}
+                  </div>
+                  {group.threads.map((thread) => (
+                    <ThreadListItem
+                      key={thread.id}
+                      thread={thread}
+                      selected={thread.id === selected?.id}
+                      isRead={readIds.has(thread.id) || thread.status !== 'new'}
+                      onClick={() => {
+                        setSelectedId(thread.id);
+                        setShowDetail(true);
+                        if (thread.status === 'new' && !readIds.has(thread.id)) {
+                          setReadIds((prev) => new Set([...prev, thread.id]));
+                          startTransition(() => {
+                            updateThreadStatusAction(thread.id, 'needs_response');
+                          });
+                        }
+                      }}
+                    />
+                  ))}
+                </div>
+              ));
+            })()
           )}
         </div>
       </div>
