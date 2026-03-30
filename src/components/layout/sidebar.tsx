@@ -8,6 +8,7 @@ import {
   Users,
   UserSearch,
   Inbox,
+  Newspaper,
   RefreshCw,
   Settings,
   ChevronRight,
@@ -27,6 +28,7 @@ const navItemDefs: NavItem[] = [
   { key: 'clients', path: '/clients', icon: Users },
   { key: 'journalists', path: '/journalists', icon: UserSearch },
   { key: 'inbox', path: '/inbox', icon: Inbox },
+  { key: 'clippings', path: '/clippings', icon: Newspaper },
   { key: 'improvements', path: '/improvements', icon: RefreshCw },
 ];
 
