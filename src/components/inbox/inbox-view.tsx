@@ -487,12 +487,12 @@ export function InboxView({ threads }: InboxViewProps) {
                 <div key={campaignId}>
                   {/* Campaign header */}
                   <div className="px-4 py-2 border-b border-white/[0.04] bg-white/[0.02] sticky top-0 z-10">
+                    {group.clientName && (
+                      <p className="text-[20px] font-bold text-foreground truncate">{group.clientName}</p>
+                    )}
                     <p className="text-[11px] font-semibold text-foreground/70 truncate">
                       {group.campaignName}
                     </p>
-                    {group.clientName && (
-                      <p className="text-[10px] text-hpr-gold/60 truncate">{group.clientName}</p>
-                    )}
                   </div>
                   {group.threads.map((thread) => (
                     <ThreadListItem
