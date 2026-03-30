@@ -142,7 +142,7 @@ function MessageBubble({ message }: { message: EmailMessageRow }) {
             : 'bg-hpr-gold/10 border border-hpr-gold/20 text-foreground/90'
         }`}
       >
-        {message.body_html ? (
+        {isInbound && message.body_html ? (
           <div
             className="prose prose-invert prose-sm max-w-none text-sm"
             dangerouslySetInnerHTML={{ __html: message.body_html }}
