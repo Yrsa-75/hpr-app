@@ -319,7 +319,7 @@ export async function importJournalistsAction(
     // Validate media_type — supports multiple values separated by / or , (first valid one is used)
     const validMediaTypes = ['presse_ecrite', 'tv', 'radio', 'web', 'podcast', 'blog', 'influenceur'];
     const rawMediaTypes = parseImportSeparated(journalist.media_type) ?? [];
-    const mediaType = (rawMediaTypes.find((t) => validMediaTypes.includes(t.toLowerCase())) ?? null) as
+    const mediaType = (rawMediaTypes.map((t) => t.toLowerCase().trim()).find((t) => validMediaTypes.includes(t)) ?? null) as
       | 'presse_ecrite' | 'tv' | 'radio' | 'web' | 'podcast' | 'blog' | 'influenceur'
       | null;
 
