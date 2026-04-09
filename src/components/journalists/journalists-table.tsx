@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import { useTranslations } from 'next-intl';
-import { Search, Pencil, Trash2, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Search, Pencil, Trash2, Loader2 } from 'lucide-react';
 
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -27,7 +27,7 @@ import { JournalistFormDialog } from '@/components/journalists/journalist-form-d
 import { deleteJournalistAction } from '@/app/[locale]/(dashboard)/journalists/actions';
 import type { JournalistRow } from '@/types/database';
 
-const PAGE_SIZE = 20;
+const PAGE_SIZE = 50;
 
 const MEDIA_TYPE_COLORS: Record<string, string> = {
   presse_ecrite: 'bg-blue-500/10 text-blue-400',
@@ -71,7 +71,8 @@ export function JournalistsTable({ journalists }: JournalistsTableProps) {
 
   const [search, setSearch] = React.useState('');
   const [mediaTypeFilter, setMediaTypeFilter] = React.useState('all');
-  const [page, setPage] = React.useState(0);
+  const [visibleCount, setVisibleCount] = React.useState(PAGE_SIZE);
+  const sentinelRef = React.useRef<HTMLDivElement>(null);
   const [editingJournalist, setEditingJournalist] = React.useState<JournalistRow | null>(null);
   const [dialogOpen, setDialogOpen] = React.useState(false);
   const [deletingId, setDeletingId] = React.useState<string | null>(null);
@@ -91,13 +92,29 @@ export function JournalistsTable({ journalists }: JournalistsTableProps) {
     });
   }, [journalists, search, mediaTypeFilter]);
 
-  // Reset page when filter changes
+  // Reset visible count when filters change
   React.useEffect(() => {
-    setPage(0);
+    setVisibleCount(PAGE_SIZE);
   }, [search, mediaTypeFilter]);
 
-  const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
-  const paginated = filtered.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
+  // IntersectionObserver for infinite scroll
+  React.useEffect(() => {
+    const sentinel = sentinelRef.current;
+    if (!sentinel) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting) {
+          setVisibleCount((c) => Math.min(c + PAGE_SIZE, filtered.length));
+        }
+      },
+      { threshold: 0.1 }
+    );
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [filtered.length]);
+
+  const paginated = filtered.slice(0, visibleCount);
+  const hasMore = visibleCount < filtered.length;
 
   const handleEdit = (journalist: JournalistRow) => {
     setEditingJournalist(journalist);
@@ -273,35 +290,15 @@ export function JournalistsTable({ journalists }: JournalistsTableProps) {
             </TableBody>
           </Table>
 
-          {/* Pagination */}
-          {totalPages > 1 && (
-            <div className="flex items-center justify-between px-4 py-3 border-t border-white/[0.06]">
-              <span className="text-xs text-muted-foreground">
-                {page * PAGE_SIZE + 1}–{Math.min((page + 1) * PAGE_SIZE, filtered.length)} {tCommon('of')} {filtered.length}
-              </span>
-              <div className="flex items-center gap-1">
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-8 w-8"
-                  onClick={() => setPage((p) => Math.max(0, p - 1))}
-                  disabled={page === 0}
-                >
-                  <ChevronLeft className="h-4 w-4" />
-                </Button>
-                <span className="text-xs text-muted-foreground px-2">
-                  {page + 1} / {totalPages}
-                </span>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-8 w-8"
-                  onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
-                  disabled={page >= totalPages - 1}
-                >
-                  <ChevronRight className="h-4 w-4" />
-                </Button>
-              </div>
+          {/* Load more sentinel */}
+          {hasMore && (
+            <div ref={sentinelRef} className="flex items-center justify-center py-4 border-t border-white/[0.06]">
+              <Loader2 className="h-4 w-4 animate-spin text-muted-foreground/50" />
+            </div>
+          )}
+          {!hasMore && filtered.length > PAGE_SIZE && (
+            <div className="px-4 py-3 border-t border-white/[0.06] text-center">
+              <span className="text-xs text-muted-foreground">{filtered.length} journalistes affichés</span>
             </div>
           )}
         </div>
