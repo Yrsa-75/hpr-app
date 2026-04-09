@@ -9,7 +9,9 @@ import { TargetingTab } from '@/components/campaigns/targeting-tab';
 import { SendingTab, type EmailSendWithJoins } from '@/components/campaigns/sending-tab';
 import { TrackingTab } from '@/components/campaigns/tracking-tab';
 import { RepliesTab, type ThreadWithJoins } from '@/components/campaigns/replies-tab';
+import { ClippingsTab } from '@/components/campaigns/clippings-tab';
 import type { PressReleaseRow, JournalistRow } from '@/types/database';
+import type { ClippingWithJoins } from '@/app/[locale]/(dashboard)/clippings/page';
 
 interface ClientInfo {
   name: string;
@@ -25,6 +27,7 @@ interface CampaignTabsProps {
   selectedJournalistIds: string[];
   emailSends: EmailSendWithJoins[];
   threads: ThreadWithJoins[];
+  clippings: ClippingWithJoins[];
   client: ClientInfo;
 }
 
@@ -52,6 +55,7 @@ export function CampaignTabs({
   selectedJournalistIds,
   emailSends,
   threads,
+  clippings,
   client,
 }: CampaignTabsProps) {
   const t = useTranslations('campaigns');
@@ -83,7 +87,14 @@ export function CampaignTabs({
             </span>
           )}
         </TabsTrigger>
-        <TabsTrigger value="clippings">{t('tabs.clippings')}</TabsTrigger>
+        <TabsTrigger value="clippings">
+          {t('tabs.clippings')}
+          {clippings.length > 0 && (
+            <span className="ml-1.5 text-[10px] bg-white/10 text-muted-foreground px-1.5 py-0 rounded-full">
+              {clippings.length}
+            </span>
+          )}
+        </TabsTrigger>
         <TabsTrigger value="report">{t('tabs.report')}</TabsTrigger>
       </TabsList>
 
@@ -122,7 +133,7 @@ export function CampaignTabs({
       </TabsContent>
 
       <TabsContent value="clippings">
-        <ComingSoonTab label={t('tabs.clippings')} />
+        <ClippingsTab clippings={clippings} />
       </TabsContent>
 
       <TabsContent value="report">

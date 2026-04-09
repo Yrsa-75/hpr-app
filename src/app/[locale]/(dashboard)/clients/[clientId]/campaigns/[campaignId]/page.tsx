@@ -7,6 +7,7 @@ import { CampaignTabs } from '@/components/campaigns/campaign-tabs';
 import type { CampaignRow, PressReleaseRow, JournalistRow } from '@/types/database';
 import type { EmailSendWithJoins } from '@/components/campaigns/sending-tab';
 import type { ThreadWithJoins } from '@/components/campaigns/replies-tab';
+import type { ClippingWithJoins } from '@/app/[locale]/(dashboard)/clippings/page';
 import { cn } from '@/lib/utils';
 
 type CampaignStatus = CampaignRow['status'];
@@ -119,6 +120,14 @@ export default async function CampaignDetailPage({
     .eq('campaign_id', campaignId)
     .order('updated_at', { ascending: false });
 
+  // Fetch press clippings for this campaign
+  const { data: clippings } = await supabase
+    .from('press_clippings')
+    .select('*, campaigns(name), clients(name)')
+    .eq('campaign_id', campaignId)
+    .order('published_at', { ascending: false, nullsFirst: false })
+    .order('created_at', { ascending: false });
+
   const threads = (rawThreads ?? []).map((t) => ({
     ...t,
     email_messages: ((t.email_messages ?? []) as { created_at: string }[]).sort(
@@ -211,6 +220,7 @@ export default async function CampaignDetailPage({
         selectedJournalistIds={selectedJournalistIds}
         emailSends={(emailSends ?? []) as unknown as EmailSendWithJoins[]}
         threads={(threads ?? []) as unknown as ThreadWithJoins[]}
+        clippings={(clippings ?? []) as ClippingWithJoins[]}
         client={{
           name: clientData?.name ?? '',
           sender_name: clientData?.sender_name ?? null,

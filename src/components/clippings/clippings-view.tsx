@@ -21,7 +21,7 @@ function formatDate(dateStr: string | null): string {
   });
 }
 
-function ClippingCard({ clipping }: { clipping: ClippingWithJoins }) {
+export function ClippingCard({ clipping }: { clipping: ClippingWithJoins }) {
   const { toast } = useToast();
   const [isVerifying, setIsVerifying] = React.useState(false);
   const [isDeleting, setIsDeleting] = React.useState(false);
