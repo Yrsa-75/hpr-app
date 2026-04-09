@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/server';
 import { CampaignTabs } from '@/components/campaigns/campaign-tabs';
 import type { CampaignRow, PressReleaseRow, JournalistRow } from '@/types/database';
 import type { EmailSendWithJoins } from '@/components/campaigns/sending-tab';
+import type { ThreadWithJoins } from '@/components/campaigns/replies-tab';
 import { cn } from '@/lib/utils';
 
 type CampaignStatus = CampaignRow['status'];
@@ -111,6 +112,20 @@ export default async function CampaignDetailPage({
 
   const selectedJournalistIds = (emailSends ?? []).map((s: { journalist_id: string }) => s.journalist_id);
 
+  // Fetch email threads with journalist info and messages (same shape as inbox)
+  const { data: rawThreads } = await supabase
+    .from('email_threads')
+    .select('*, journalists(first_name, last_name, email, media_outlet), campaigns(id, name, clients(name)), email_messages(*)')
+    .eq('campaign_id', campaignId)
+    .order('updated_at', { ascending: false });
+
+  const threads = (rawThreads ?? []).map((t) => ({
+    ...t,
+    email_messages: ((t.email_messages ?? []) as { created_at: string }[]).sort(
+      (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+    ),
+  }));
+
   const statusConfig = getStatusConfig(campaign.status);
   const formattedDate = formatDate(campaign.target_date);
 
@@ -195,6 +210,7 @@ export default async function CampaignDetailPage({
         journalists={(journalists ?? []) as JournalistRow[]}
         selectedJournalistIds={selectedJournalistIds}
         emailSends={(emailSends ?? []) as unknown as EmailSendWithJoins[]}
+        threads={(threads ?? []) as unknown as ThreadWithJoins[]}
         client={{
           name: clientData?.name ?? '',
           sender_name: clientData?.sender_name ?? null,

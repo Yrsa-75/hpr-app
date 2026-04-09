@@ -8,6 +8,7 @@ import { PressReleaseEditor } from '@/components/campaigns/press-release-editor'
 import { TargetingTab } from '@/components/campaigns/targeting-tab';
 import { SendingTab, type EmailSendWithJoins } from '@/components/campaigns/sending-tab';
 import { TrackingTab } from '@/components/campaigns/tracking-tab';
+import { RepliesTab, type ThreadWithJoins } from '@/components/campaigns/replies-tab';
 import type { PressReleaseRow, JournalistRow } from '@/types/database';
 
 interface ClientInfo {
@@ -23,6 +24,7 @@ interface CampaignTabsProps {
   journalists: JournalistRow[];
   selectedJournalistIds: string[];
   emailSends: EmailSendWithJoins[];
+  threads: ThreadWithJoins[];
   client: ClientInfo;
 }
 
@@ -49,6 +51,7 @@ export function CampaignTabs({
   journalists,
   selectedJournalistIds,
   emailSends,
+  threads,
   client,
 }: CampaignTabsProps) {
   const t = useTranslations('campaigns');
@@ -72,7 +75,14 @@ export function CampaignTabs({
         </TabsTrigger>
         <TabsTrigger value="sending">{t('tabs.sending')}</TabsTrigger>
         <TabsTrigger value="tracking">{t('tabs.tracking')}</TabsTrigger>
-        <TabsTrigger value="replies">{t('tabs.replies')}</TabsTrigger>
+        <TabsTrigger value="replies">
+          {t('tabs.replies')}
+          {threads.length > 0 && (
+            <span className="ml-1.5 text-[10px] bg-white/10 text-muted-foreground px-1.5 py-0 rounded-full">
+              {threads.length}
+            </span>
+          )}
+        </TabsTrigger>
         <TabsTrigger value="clippings">{t('tabs.clippings')}</TabsTrigger>
         <TabsTrigger value="report">{t('tabs.report')}</TabsTrigger>
       </TabsList>
@@ -108,7 +118,7 @@ export function CampaignTabs({
       </TabsContent>
 
       <TabsContent value="replies">
-        <ComingSoonTab label={t('tabs.replies')} />
+        <RepliesTab threads={threads} />
       </TabsContent>
 
       <TabsContent value="clippings">
