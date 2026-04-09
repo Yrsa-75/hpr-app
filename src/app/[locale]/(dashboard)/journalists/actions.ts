@@ -44,6 +44,7 @@ export type JournalistImport = {
   last_name: string;
   email: string;
   phone?: string;
+  phone_direct?: string;
   media_outlet?: string;
   media_type?: string;
   beat?: string;
@@ -297,6 +298,7 @@ export async function importJournalistsAction(
       last_name: journalist.last_name.trim(),
       email: journalist.email.trim().toLowerCase(),
       phone: journalist.phone?.trim() || null,
+      phone_direct: journalist.phone_direct?.trim() || null,
       media_outlet: journalist.media_outlet?.trim() || null,
       media_type: mediaType,
       beat: parseImportSeparated(journalist.beat),
