@@ -148,27 +148,41 @@ export function CsvImportDialog({ open, onOpenChange }: CsvImportDialogProps) {
 
     setFileName(file.name);
 
-    Papa.parse<Record<string, string>>(file, {
-      header: true,
-      skipEmptyLines: true,
-      complete: (result) => {
-        const columns = result.meta.fields ?? [];
-        const rows = result.data;
+    // Auto-detect encoding: try strict UTF-8, fall back to Windows-1252 (common for Excel CSVs)
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const buffer = e.target?.result as ArrayBuffer;
+      let encoding = 'UTF-8';
+      try {
+        new TextDecoder('utf-8', { fatal: true }).decode(buffer);
+      } catch {
+        encoding = 'windows-1252';
+      }
 
-        if (columns.length === 0) {
-          toast({ title: 'Fichier vide', description: 'Le fichier CSV ne contient pas de colonnes.', variant: 'destructive' });
-          return;
-        }
+      Papa.parse<Record<string, string>>(file, {
+        header: true,
+        skipEmptyLines: true,
+        encoding,
+        complete: (result) => {
+          const columns = result.meta.fields ?? [];
+          const rows = result.data;
 
-        setCsvColumns(columns);
-        setCsvRows(rows);
-        setMapping(autoMap(columns));
-        setStep('mapping');
-      },
-      error: () => {
-        toast({ title: 'Erreur de lecture', description: 'Impossible de lire le fichier CSV.', variant: 'destructive' });
-      },
-    });
+          if (columns.length === 0) {
+            toast({ title: 'Fichier vide', description: 'Le fichier CSV ne contient pas de colonnes.', variant: 'destructive' });
+            return;
+          }
+
+          setCsvColumns(columns);
+          setCsvRows(rows);
+          setMapping(autoMap(columns));
+          setStep('mapping');
+        },
+        error: () => {
+          toast({ title: 'Erreur de lecture', description: 'Impossible de lire le fichier CSV.', variant: 'destructive' });
+        },
+      });
+    };
+    reader.readAsArrayBuffer(file);
   };
 
   const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -285,6 +299,9 @@ export function CsvImportDialog({ open, onOpenChange }: CsvImportDialogProps) {
             </Button>
             <p className="mt-4 text-xs text-muted-foreground">
               Colonnes requises : prénom, nom, email
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground/60">
+              Pour les thématiques et tags multi-valeurs, séparez avec <code className="font-mono bg-white/[0.06] px-1 rounded">/</code> (ex : <code className="font-mono bg-white/[0.06] px-1 rounded">web/tv</code>)
             </p>
           </div>
         )}

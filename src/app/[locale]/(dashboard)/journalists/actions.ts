@@ -70,6 +70,15 @@ function parseCommaSeparated(val: string | undefined): string[] | null {
     .filter(Boolean);
 }
 
+// For CSV imports: accepts both / and , as separators
+function parseImportSeparated(val: string | undefined): string[] | null {
+  if (!val || val.trim() === '') return null;
+  return val
+    .split(/[/,]/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
+
 async function getOrganizationId(
   supabase: Awaited<ReturnType<typeof createClient>>
 ): Promise<string | null> {
@@ -275,11 +284,12 @@ export async function importJournalistsAction(
       continue;
     }
 
-    // Validate media_type if provided
+    // Validate media_type — supports multiple values separated by / or , (first valid one is used)
     const validMediaTypes = ['presse_ecrite', 'tv', 'radio', 'web', 'podcast', 'blog', 'influenceur'];
-    const mediaType = journalist.media_type && validMediaTypes.includes(journalist.media_type)
-      ? (journalist.media_type as 'presse_ecrite' | 'tv' | 'radio' | 'web' | 'podcast' | 'blog' | 'influenceur')
-      : null;
+    const rawMediaTypes = parseImportSeparated(journalist.media_type) ?? [];
+    const mediaType = (rawMediaTypes.find((t) => validMediaTypes.includes(t.toLowerCase())) ?? null) as
+      | 'presse_ecrite' | 'tv' | 'radio' | 'web' | 'podcast' | 'blog' | 'influenceur'
+      | null;
 
     const { error } = await supabase.from('journalists').insert({
       organization_id: organizationId,
@@ -289,12 +299,12 @@ export async function importJournalistsAction(
       phone: journalist.phone?.trim() || null,
       media_outlet: journalist.media_outlet?.trim() || null,
       media_type: mediaType,
-      beat: parseCommaSeparated(journalist.beat),
+      beat: parseImportSeparated(journalist.beat),
       location: journalist.location?.trim() || null,
       linkedin_url: journalist.linkedin_url?.trim() || null,
       twitter_handle: journalist.twitter_handle?.trim() || null,
       notes: journalist.notes?.trim() || null,
-      tags: parseCommaSeparated(journalist.tags),
+      tags: parseImportSeparated(journalist.tags),
     });
 
     if (error) {
