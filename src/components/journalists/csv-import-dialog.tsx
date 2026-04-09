@@ -12,6 +12,7 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog';
+import type { ImportError } from '@/app/[locale]/(dashboard)/journalists/actions';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -50,6 +51,7 @@ interface ImportResult {
   imported: number;
   skipped: number;
   errors: number;
+  errorDetails: ImportError[];
 }
 
 interface CsvImportDialogProps {
@@ -225,7 +227,7 @@ export function CsvImportDialog({ open, onOpenChange }: CsvImportDialogProps) {
     try {
       const res = await importJournalistsAction(data);
       if (res.success) {
-        setResult({ imported: res.imported, skipped: res.skipped, errors: res.errors });
+        setResult({ imported: res.imported, skipped: res.skipped, errors: res.errors, errorDetails: res.errorDetails });
         setStep('result');
       } else {
         toast({ title: tCommon('error'), description: res.error, variant: 'destructive' });
@@ -410,8 +412,8 @@ export function CsvImportDialog({ open, onOpenChange }: CsvImportDialogProps) {
 
         {/* Step 4: Result */}
         {step === 'result' && result && (
-          <div className="space-y-4 py-4">
-            <div className="flex items-center justify-center mb-2">
+          <div className="space-y-4 py-2">
+            <div className="flex items-center justify-center">
               <div className="flex h-12 w-12 items-center justify-center rounded-full bg-green-500/10">
                 <CheckCircle2 className="h-6 w-6 text-green-400" />
               </div>
@@ -432,6 +434,32 @@ export function CsvImportDialog({ open, onOpenChange }: CsvImportDialogProps) {
                 <p className="text-xs text-muted-foreground mt-0.5">Erreurs</p>
               </div>
             </div>
+
+            {result.errorDetails.length > 0 && (
+              <div className="space-y-2">
+                <p className="text-xs font-medium text-red-400">
+                  Détail des {result.errorDetails.length} erreur{result.errorDetails.length > 1 ? 's' : ''} :
+                </p>
+                <div className="rounded-lg border border-red-500/20 bg-red-500/5 overflow-hidden max-h-56 overflow-y-auto">
+                  <div className="grid grid-cols-[auto_1fr_1fr_2fr] gap-0 px-3 py-1.5 bg-red-500/10 text-[10px] font-medium text-red-400/80 sticky top-0">
+                    <span className="w-10">Ligne</span>
+                    <span>Nom</span>
+                    <span>Email</span>
+                    <span>Raison</span>
+                  </div>
+                  <div className="divide-y divide-red-500/10">
+                    {result.errorDetails.map((err, i) => (
+                      <div key={i} className="grid grid-cols-[auto_1fr_1fr_2fr] gap-0 px-3 py-1.5 text-[11px]">
+                        <span className="w-10 text-muted-foreground/60 font-mono">{err.row}</span>
+                        <span className="text-foreground/80 truncate pr-2">{err.name}</span>
+                        <span className="text-muted-foreground/70 truncate pr-2 font-mono text-[10px]">{err.email || '—'}</span>
+                        <span className="text-red-400/80">{err.reason}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         )}
 

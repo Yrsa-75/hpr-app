@@ -55,11 +55,19 @@ export type JournalistImport = {
   tags?: string;
 };
 
+export type ImportError = {
+  row: number;
+  name: string;
+  email: string;
+  reason: string;
+};
+
 export type ImportResult = {
   success: boolean;
   imported: number;
   skipped: number;
   errors: number;
+  errorDetails: ImportError[];
   error?: string;
 };
 
@@ -264,24 +272,42 @@ export async function importJournalistsAction(
 
   const organizationId = await getOrganizationId(supabase);
   if (!organizationId) {
-    return { success: false, imported: 0, skipped: 0, errors: 0, error: 'Non autorisé' };
+    return { success: false, imported: 0, skipped: 0, errors: 0, errorDetails: [], error: 'Non autorisé' };
   }
 
   let imported = 0;
   let skipped = 0;
   let errors = 0;
+  const errorDetails: ImportError[] = [];
 
-  for (const journalist of journalists) {
+  for (let i = 0; i < journalists.length; i++) {
+    const journalist = journalists[i];
+    const rowNum = i + 2; // +2 because row 1 is header
+    const name = [journalist.first_name, journalist.last_name].filter(Boolean).join(' ') || `Ligne ${rowNum}`;
+    const email = journalist.email ?? '';
+
     // Basic validation
-    if (!journalist.first_name || !journalist.last_name || !journalist.email) {
+    if (!journalist.first_name?.trim()) {
       errors++;
+      errorDetails.push({ row: rowNum, name, email, reason: 'Prénom manquant' });
+      continue;
+    }
+    if (!journalist.last_name?.trim()) {
+      errors++;
+      errorDetails.push({ row: rowNum, name, email, reason: 'Nom manquant' });
+      continue;
+    }
+    if (!journalist.email?.trim()) {
+      errors++;
+      errorDetails.push({ row: rowNum, name, email, reason: 'Email manquant' });
       continue;
     }
 
     // Validate email format
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(journalist.email)) {
+    if (!emailRegex.test(journalist.email.trim())) {
       errors++;
+      errorDetails.push({ row: rowNum, name, email, reason: `Email invalide : "${journalist.email}"` });
       continue;
     }
 
@@ -314,6 +340,7 @@ export async function importJournalistsAction(
         skipped++;
       } else {
         errors++;
+        errorDetails.push({ row: rowNum, name, email, reason: error.message });
       }
     } else {
       imported++;
@@ -321,5 +348,5 @@ export async function importJournalistsAction(
   }
 
   revalidatePath('/[locale]/(dashboard)/journalists', 'page');
-  return { success: true, imported, skipped, errors };
+  return { success: true, imported, skipped, errors, errorDetails };
 }
