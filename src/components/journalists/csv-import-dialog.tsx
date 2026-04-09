@@ -34,7 +34,7 @@ const HPR_FIELDS = [
   { key: 'email', label: 'Email', required: true },
   { key: 'phone', label: 'Téléphone', required: false },
   { key: 'phone_direct', label: 'Téléphone (Ligne directe)', required: false },
-  { key: 'media_outlet', label: 'Média', required: false },
+  { key: 'media_outlet', label: 'Nom du média', required: true },
   { key: 'media_type', label: 'Type de média', required: false },
   { key: 'beat', label: 'Thématiques', required: false },
   { key: 'location', label: 'Localisation', required: false },
@@ -306,7 +306,7 @@ export function CsvImportDialog({ open, onOpenChange }: CsvImportDialogProps) {
               Choisir un fichier .csv
             </Button>
             <p className="mt-4 text-xs text-muted-foreground">
-              Colonnes requises : prénom, nom, email
+              Colonnes requises : prénom, nom, email, nom du média
             </p>
             <p className="mt-1 text-xs text-muted-foreground/60">
               Pour les thématiques et tags multi-valeurs, séparez avec <code className="font-mono bg-white/[0.06] px-1 rounded">/</code> (ex : <code className="font-mono bg-white/[0.06] px-1 rounded">web/tv</code>)
@@ -365,7 +365,7 @@ export function CsvImportDialog({ open, onOpenChange }: CsvImportDialogProps) {
               <div className="flex items-center gap-2 rounded-lg border border-orange-500/20 bg-orange-500/5 px-3 py-2">
                 <AlertCircle className="h-4 w-4 text-orange-400 shrink-0" />
                 <p className="text-xs text-orange-400">
-                  Vous devez mapper les champs obligatoires : Prénom, Nom, Email.
+                  Vous devez mapper les champs obligatoires : Prénom, Nom, Email, Nom du média.
                 </p>
               </div>
             )}
@@ -379,7 +379,8 @@ export function CsvImportDialog({ open, onOpenChange }: CsvImportDialogProps) {
               Aperçu des 5 premières lignes qui seront importées ({csvRows.length} au total).
             </p>
 
-            <div className="rounded-lg border border-white/[0.08] overflow-hidden overflow-x-auto">
+            <div className="rounded-lg border border-white/[0.08] overflow-hidden">
+            <div className="overflow-x-auto">
               <table className="w-full text-xs">
                 <thead>
                   <tr className="bg-white/[0.03]">
@@ -402,6 +403,7 @@ export function CsvImportDialog({ open, onOpenChange }: CsvImportDialogProps) {
                   ))}
                 </tbody>
               </table>
+            </div>
             </div>
 
             <p className="text-xs text-muted-foreground">

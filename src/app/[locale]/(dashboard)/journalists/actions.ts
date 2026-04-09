@@ -302,6 +302,11 @@ export async function importJournalistsAction(
       errorDetails.push({ row: rowNum, name, email, reason: 'Email manquant' });
       continue;
     }
+    if (!journalist.media_outlet?.trim()) {
+      errors++;
+      errorDetails.push({ row: rowNum, name, email, reason: 'Nom du média manquant' });
+      continue;
+    }
 
     // Validate email format
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
