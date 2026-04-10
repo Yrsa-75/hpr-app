@@ -3,6 +3,44 @@
 import { revalidatePath } from 'next/cache';
 import { createClient } from '@/lib/supabase/server';
 
+export async function updateCampaignAction(
+  campaignId: string,
+  data: {
+    name: string;
+    description?: string;
+    target_date?: string;
+    tags?: string;
+    keywords?: string;
+  }
+): Promise<{ success: boolean; error?: string }> {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { success: false, error: 'Unauthorized' };
+
+  const tags = data.tags
+    ? data.tags.split(',').map((t) => t.trim()).filter(Boolean)
+    : [];
+  const keywords = data.keywords
+    ? data.keywords.split(',').map((k) => k.trim()).filter(Boolean)
+    : [];
+
+  const { error } = await supabase
+    .from('campaigns')
+    .update({
+      name: data.name,
+      description: data.description || null,
+      target_date: data.target_date || null,
+      tags,
+      keywords,
+    })
+    .eq('id', campaignId);
+
+  if (error) return { success: false, error: error.message };
+
+  revalidatePath(`/[locale]/(dashboard)/clients/[clientId]/campaigns/[campaignId]`, 'page');
+  return { success: true };
+}
+
 export async function deleteEmailSendsAction(
   campaignId: string,
   sendIds: string[]

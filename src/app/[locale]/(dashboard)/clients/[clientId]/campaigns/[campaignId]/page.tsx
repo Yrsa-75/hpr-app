@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { ArrowLeft, Calendar, Clock } from 'lucide-react';
 import { createClient } from '@/lib/supabase/server';
 import { CampaignTabs } from '@/components/campaigns/campaign-tabs';
+import { EditCampaignButton } from '@/components/campaigns/edit-campaign-button';
 import type { CampaignRow, PressReleaseRow, JournalistRow } from '@/types/database';
 import type { EmailSendWithJoins } from '@/components/campaigns/sending-tab';
 import type { ThreadWithJoins } from '@/components/campaigns/replies-tab';
@@ -190,6 +191,7 @@ export default async function CampaignDetailPage({
               </span>
             </div>
           </div>
+          <EditCampaignButton campaign={campaign as CampaignRow} />
         </div>
 
         {campaign.description && (
