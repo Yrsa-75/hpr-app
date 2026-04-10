@@ -12,6 +12,7 @@ interface ClientInfo {
   slug: string | null;
   sender_name: string | null;
   sender_email: string | null;
+  email_signature_html: string | null;
 }
 
 // Extended type with joined data from the page query
@@ -258,6 +259,8 @@ function buildEmailHtml(pressRelease: PressReleaseRow, client: ClientInfo): stri
        </div>`
     : '';
 
+  const signature = client.email_signature_html ?? '';
+
   return `<!DOCTYPE html>
 <html>
 <head>
@@ -278,6 +281,7 @@ function buildEmailHtml(pressRelease: PressReleaseRow, client: ClientInfo): stri
     hr { border: none; border-top: 1px solid #e5e5e5; margin: 20px 0; }
     .footer { margin-top: 32px; padding-top: 16px; border-top: 1px solid #e5e5e5; font-size: 11px; color: #999; text-align: center; }
     .unsubscribe-btn { display: inline-block; margin-top: 8px; padding: 6px 16px; border: 1px solid #d1d5db; border-radius: 4px; font-size: 11px; color: #6b7280; text-decoration: none; }
+    .signature { margin-top: 28px; padding-top: 16px; border-top: 1px solid #e5e5e5; }
     .media-pack { margin-top: 28px; padding: 14px 18px; background: #fafaf7; border: 1px solid #e8e0c8; border-radius: 6px; text-align: center; }
     .media-pack a { font-size: 13px; font-weight: 600; color: #b8860b; text-decoration: none; letter-spacing: 0.01em; }
   </style>
@@ -287,6 +291,7 @@ function buildEmailHtml(pressRelease: PressReleaseRow, client: ClientInfo): stri
   ${pressRelease.subtitle ? `<p class="subtitle">${pressRelease.subtitle}</p>` : ''}
   <hr class="separator">
   <div class="body-content">${pressRelease.body_html ?? ''}</div>
+  ${signature ? `<div class="signature">${signature}</div>` : ''}
   ${mediaPackBlock}
   <div class="footer">
     Vous recevez ce communiqué en tant que journaliste professionnel.<br>

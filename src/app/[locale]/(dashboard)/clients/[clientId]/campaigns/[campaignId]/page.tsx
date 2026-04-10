@@ -83,7 +83,7 @@ export default async function CampaignDetailPage({
   // Fetch client (with sender info)
   const { data: clientData } = await supabase
     .from('clients')
-    .select('name, slug, sender_name, sender_email')
+    .select('name, slug, sender_name, sender_email, email_signature_html')
     .eq('id', clientId)
     .single();
 
@@ -226,6 +226,7 @@ export default async function CampaignDetailPage({
           slug: clientData?.slug ?? null,
           sender_name: clientData?.sender_name ?? null,
           sender_email: clientData?.sender_email ?? null,
+          email_signature_html: clientData?.email_signature_html ?? null,
         }}
       />
     </div>

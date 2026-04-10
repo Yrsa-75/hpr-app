@@ -18,6 +18,7 @@ interface ClientInfo {
   slug: string | null;
   sender_name: string | null;
   sender_email: string | null;
+  email_signature_html: string | null;
 }
 
 interface CampaignTabsProps {

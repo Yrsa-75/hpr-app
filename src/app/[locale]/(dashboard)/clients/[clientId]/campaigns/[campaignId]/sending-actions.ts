@@ -120,8 +120,8 @@ export async function sendCampaignAction(
   ${pr.subtitle ? `<p class="subtitle">${pr.subtitle}</p>` : ''}
   <hr class="separator">
   <div class="body-content">${pr.body_html ?? ''}</div>
-  ${mediaPackBlock}
   ${signature ? `<div class="signature">${signature}</div>` : ''}
+  ${mediaPackBlock}
   <div class="footer">
     Vous recevez ce communiqué en tant que journaliste professionnel.<br>
     <a href="${unsubscribeUrl}" class="unsubscribe-btn">Se désinscrire</a>
