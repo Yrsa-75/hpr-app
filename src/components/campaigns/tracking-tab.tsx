@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import { useRouter } from 'next/navigation';
-import { Mail, Eye, MousePointer, XCircle, AlertTriangle, Clock, RefreshCw, Trash2 } from 'lucide-react';
+import { Mail, Eye, MousePointer, XCircle, AlertTriangle, Clock, RefreshCw, Trash2, ChevronUp, ChevronDown, ChevronsUpDown } from 'lucide-react';
 import type { EmailSendWithJoins } from '@/components/campaigns/sending-tab';
 import { deleteEmailSendsAction } from '@/app/[locale]/(dashboard)/clients/[clientId]/campaigns/[campaignId]/actions';
 import { useToast } from '@/components/ui/use-toast';
@@ -60,6 +60,8 @@ export function TrackingTab({ emailSends, campaignId }: TrackingTabProps) {
   const [lastRefresh, setLastRefresh] = React.useState<Date>(new Date());
   const [selectedIds, setSelectedIds] = React.useState<Set<string>>(new Set());
   const [isDeleting, setIsDeleting] = React.useState(false);
+  const [sortCol, setSortCol] = React.useState<'sent_at' | 'opened_at' | 'status' | null>(null);
+  const [sortDir, setSortDir] = React.useState<'asc' | 'desc'>('asc');
 
   const sent = emailSends.filter((s) => s.status !== 'queued');
   const total = sent.length;
@@ -78,6 +80,32 @@ export function TrackingTab({ emailSends, campaignId }: TrackingTabProps) {
     const interval = setInterval(refresh, 30_000);
     return () => clearInterval(interval);
   }, [hasPending, refresh]);
+
+  const handleSort = (col: 'sent_at' | 'opened_at' | 'status') => {
+    if (sortCol === col) {
+      setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSortCol(col);
+      setSortDir('asc');
+    }
+  };
+
+  const sortedSent = React.useMemo(() => {
+    if (!sortCol) return sent;
+    return [...sent].sort((a, b) => {
+      let valA: string | null = null;
+      let valB: string | null = null;
+      if (sortCol === 'sent_at') { valA = a.sent_at; valB = b.sent_at; }
+      else if (sortCol === 'opened_at') { valA = a.opened_at; valB = b.opened_at; }
+      else if (sortCol === 'status') { valA = a.status; valB = b.status; }
+
+      if (!valA && !valB) return 0;
+      if (!valA) return 1;
+      if (!valB) return -1;
+      const cmp = valA < valB ? -1 : valA > valB ? 1 : 0;
+      return sortDir === 'asc' ? cmp : -cmp;
+    });
+  }, [sent, sortCol, sortDir]);
 
   const toggleSelect = (id: string) => {
     setSelectedIds((prev) => {
@@ -184,7 +212,6 @@ export function TrackingTab({ emailSends, campaignId }: TrackingTabProps) {
         </div>
         <div className="rounded-xl border border-white/[0.08] overflow-hidden">
           <div className="grid grid-cols-[auto_1fr_auto_auto_auto] text-xs text-muted-foreground bg-white/[0.02] px-4 py-2 border-b border-white/[0.06] items-center gap-3">
-            {/* Select all checkbox */}
             <div
               onClick={toggleSelectAll}
               className={`h-4 w-4 rounded border flex-shrink-0 flex items-center justify-center cursor-pointer transition-colors ${
@@ -205,12 +232,24 @@ export function TrackingTab({ emailSends, campaignId }: TrackingTabProps) {
               )}
             </div>
             <span>Journaliste</span>
-            <span className="w-24 text-center">Envoyé le</span>
-            <span className="w-20 text-center">Ouverture</span>
-            <span className="w-20 text-center">Statut</span>
+            {(['sent_at', 'opened_at', 'status'] as const).map((col) => {
+              const labels = { sent_at: 'Envoyé le', opened_at: 'Ouverture', status: 'Statut' };
+              const active = sortCol === col;
+              const Icon = active ? (sortDir === 'asc' ? ChevronUp : ChevronDown) : ChevronsUpDown;
+              return (
+                <button
+                  key={col}
+                  onClick={() => handleSort(col)}
+                  className={`w-24 flex items-center justify-center gap-1 hover:text-foreground transition-colors ${active ? 'text-foreground' : ''}`}
+                >
+                  {labels[col]}
+                  <Icon className="h-3 w-3 flex-shrink-0" />
+                </button>
+              );
+            })}
           </div>
           <div className="divide-y divide-white/[0.04]">
-            {sent.map((s) => {
+            {sortedSent.map((s) => {
               const j = s.journalists;
               const isSelected = selectedIds.has(s.id);
               const statusConfig: Record<string, { label: string; color: string }> = {
