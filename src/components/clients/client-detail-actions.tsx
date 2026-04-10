@@ -10,10 +10,11 @@ import type { ClientRow } from '@/types/database';
 interface ClientDetailActionsProps {
   client: ClientRow | null;
   clientId: string;
+  clientName?: string;
   showNewCampaign: boolean;
 }
 
-export function ClientDetailActions({ client, clientId, showNewCampaign }: ClientDetailActionsProps) {
+export function ClientDetailActions({ client, clientId, clientName, showNewCampaign }: ClientDetailActionsProps) {
   const [editOpen, setEditOpen] = React.useState(false);
   const [newCampaignOpen, setNewCampaignOpen] = React.useState(false);
 
@@ -33,6 +34,7 @@ export function ClientDetailActions({ client, clientId, showNewCampaign }: Clien
           open={newCampaignOpen}
           onOpenChange={setNewCampaignOpen}
           clientId={clientId}
+          clientName={clientName}
         />
       </>
     );

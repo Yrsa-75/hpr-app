@@ -1,11 +1,11 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
-import { ExternalLink, ArrowLeft, Megaphone } from 'lucide-react';
+import { ExternalLink, ArrowLeft } from 'lucide-react';
 import { createClient } from '@/lib/supabase/server';
-import { CampaignCard } from '@/components/campaigns/campaign-card';
 import { ClientDetailActions } from '@/components/clients/client-detail-actions';
-import type { ClientRow, CampaignRow } from '@/types/database';
+import { ClientDetailTabs } from '@/components/clients/client-detail-tabs';
+import type { ClientRow, CampaignRow, ClientMediaAssetRow } from '@/types/database';
 
 export async function generateMetadata({
   params,
@@ -53,7 +53,15 @@ export default async function ClientDetailPage({
     .eq('client_id', clientId)
     .order('created_at', { ascending: false });
 
+  // Fetch media assets
+  const { data: mediaAssets } = await supabase
+    .from('client_media_assets')
+    .select('*')
+    .eq('client_id', clientId)
+    .order('created_at', { ascending: false });
+
   const campaignList: CampaignRow[] = campaigns ?? [];
+  const assetList: ClientMediaAssetRow[] = mediaAssets ?? [];
 
   // Build initials
   const initials = (() => {
@@ -129,41 +137,23 @@ export default async function ClientDetailPage({
         </div>
 
         {/* Edit client button (client-side component) */}
-        <ClientDetailActions client={client as ClientRow} clientId={clientId} showNewCampaign={false} />
+        <ClientDetailActions
+          client={client as ClientRow}
+          clientId={clientId}
+          clientName={client.name}
+          showNewCampaign={false}
+        />
       </div>
 
-      {/* Campaigns section */}
-      <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <h2 className="font-display text-lg font-semibold text-foreground">
-            Campagnes
-            <span className="ml-2 text-sm font-normal text-muted-foreground">
-              ({campaignList.length})
-            </span>
-          </h2>
-          <ClientDetailActions client={null} clientId={clientId} showNewCampaign={true} />
-        </div>
-
-        {campaignList.length > 0 ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-            {campaignList.map((campaign) => (
-              <CampaignCard key={campaign.id} campaign={campaign} clientId={clientId} />
-            ))}
-          </div>
-        ) : (
-          <div className="rounded-xl border border-white/[0.06] border-dashed bg-white/[0.01] p-16 text-center">
-            <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-white/5">
-              <Megaphone className="h-6 w-6 text-muted-foreground" />
-            </div>
-            <h3 className="font-display text-sm font-medium text-foreground mb-1">
-              Aucune campagne
-            </h3>
-            <p className="text-xs text-muted-foreground">
-              Créez la première campagne de relations presse pour ce client.
-            </p>
-          </div>
-        )}
-      </div>
+      {/* Tabs: Campagnes / Pack Média */}
+      <ClientDetailTabs
+        clientId={clientId}
+        clientSlug={client.slug}
+        clientName={client.name}
+        campaignList={campaignList}
+        assetList={assetList}
+        locale={locale}
+      />
     </div>
   );
 }

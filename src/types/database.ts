@@ -82,6 +82,7 @@ export type Database = {
           id: string;
           organization_id: string;
           name: string;
+          slug: string | null;
           industry: string | null;
           logo_url: string | null;
           description: string | null;
@@ -98,6 +99,7 @@ export type Database = {
           id?: string;
           organization_id: string;
           name: string;
+          slug?: string | null;
           industry?: string | null;
           logo_url?: string | null;
           description?: string | null;
@@ -114,6 +116,7 @@ export type Database = {
           id?: string;
           organization_id?: string;
           name?: string;
+          slug?: string | null;
           industry?: string | null;
           logo_url?: string | null;
           description?: string | null;
@@ -625,6 +628,50 @@ export type Database = {
           resend_inbound_id?: string | null;
         };
       };
+      client_media_assets: {
+        Row: {
+          id: string;
+          client_id: string;
+          organization_id: string;
+          file_name: string;
+          display_name: string;
+          file_url: string;
+          file_size: number | null;
+          mime_type: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          client_id: string;
+          organization_id: string;
+          file_name: string;
+          display_name: string;
+          file_url: string;
+          file_size?: number | null;
+          mime_type?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          client_id?: string;
+          organization_id?: string;
+          file_name?: string;
+          display_name?: string;
+          file_url?: string;
+          file_size?: number | null;
+          mime_type?: string | null;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'client_media_assets_client_id_fkey';
+            columns: ['client_id'];
+            isOneToOne: false;
+            referencedRelation: 'clients';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
     };
     Views: Record<string, {
       Row: Record<string, unknown>;
@@ -687,3 +734,6 @@ export type EmailThreadStatus = EmailThreadRow['status'];
 
 export type EmailMessageRow = Database['public']['Tables']['email_messages']['Row'];
 export type EmailMessageInsert = Database['public']['Tables']['email_messages']['Insert'];
+
+export type ClientMediaAssetRow = Database['public']['Tables']['client_media_assets']['Row'];
+export type ClientMediaAssetInsert = Database['public']['Tables']['client_media_assets']['Insert'];

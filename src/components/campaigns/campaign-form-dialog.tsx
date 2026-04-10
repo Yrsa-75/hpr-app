@@ -33,13 +33,26 @@ const campaignFormSchema = z.object({
 
 type CampaignFormValues = z.infer<typeof campaignFormSchema>;
 
+const MONTHS_FR = [
+  'Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin',
+  'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre',
+];
+
+function defaultDescription(clientName?: string) {
+  const now = new Date();
+  const month = MONTHS_FR[now.getMonth()];
+  const year = now.getFullYear();
+  return clientName ? `Communiqué de Presse ${month} ${year} - ${clientName}` : '';
+}
+
 interface CampaignFormDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   clientId: string;
+  clientName?: string;
 }
 
-export function CampaignFormDialog({ open, onOpenChange, clientId }: CampaignFormDialogProps) {
+export function CampaignFormDialog({ open, onOpenChange, clientId, clientName }: CampaignFormDialogProps) {
   const t = useTranslations('campaigns');
   const tCommon = useTranslations('common');
   const { toast } = useToast();
@@ -56,7 +69,7 @@ export function CampaignFormDialog({ open, onOpenChange, clientId }: CampaignFor
     resolver: zodResolver(campaignFormSchema),
     defaultValues: {
       name: '',
-      description: '',
+      description: defaultDescription(clientName),
       target_date: '',
       tags: '',
       keywords: '',
@@ -67,13 +80,13 @@ export function CampaignFormDialog({ open, onOpenChange, clientId }: CampaignFor
     if (open) {
       reset({
         name: '',
-        description: '',
+        description: defaultDescription(clientName),
         target_date: '',
         tags: '',
         keywords: '',
       });
     }
-  }, [open, reset]);
+  }, [open, reset, clientName]);
 
   const onSubmit = async (values: CampaignFormValues) => {
     setIsSubmitting(true);

@@ -23,6 +23,11 @@ const protectedPaths = [
 export async function middleware(request: NextRequest) {
   const { pathname, searchParams, origin } = request.nextUrl;
 
+  // Public media pack pages — no auth, no intl redirect
+  if (pathname.startsWith('/media/')) {
+    return NextResponse.next();
+  }
+
   // Forward Supabase auth codes (from password reset / magic link emails) to the callback handler
   const code = searchParams.get('code');
   if (code && !pathname.startsWith('/api/auth/')) {

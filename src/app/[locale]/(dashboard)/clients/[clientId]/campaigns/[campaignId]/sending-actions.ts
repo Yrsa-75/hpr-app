@@ -22,7 +22,7 @@ export async function sendCampaignAction(
   // Fetch campaign + client sender info
   const { data: campaign } = await supabase
     .from('campaigns')
-    .select('*, clients(name, sender_name, sender_email, email_signature_html)')
+    .select('*, clients(name, slug, sender_name, sender_email, email_signature_html)')
     .eq('id', campaignId)
     .single();
 
@@ -78,6 +78,14 @@ export async function sendCampaignAction(
     const intro = send.personalized_intro ? `<p>${send.personalized_intro}</p>` : '';
     const signature = client?.email_signature_html ?? '';
 
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://hermespressroom.com';
+    const mediaPackUrl = client?.slug ? `${appUrl}/media/${client.slug}` : null;
+    const mediaPackBlock = mediaPackUrl
+      ? `<div class="media-pack">
+           <a href="${mediaPackUrl}">⬇ Télécharger le pack média associé à ce communiqué</a>
+         </div>`
+      : '';
+
     const html = `
 <!DOCTYPE html>
 <html>
@@ -100,6 +108,8 @@ export async function sendCampaignAction(
     hr { border: none; border-top: 1px solid #e5e5e5; margin: 20px 0; }
     .footer { margin-top: 32px; padding-top: 16px; border-top: 1px solid #e5e5e5; font-size: 11px; color: #999; }
     .signature { margin-top: 28px; padding-top: 16px; border-top: 1px solid #e5e5e5; }
+    .media-pack { margin-top: 28px; padding: 14px 18px; background: #fafaf7; border: 1px solid #e8e0c8; border-radius: 6px; text-align: center; }
+    .media-pack a { font-size: 13px; font-weight: 600; color: #b8860b; text-decoration: none; letter-spacing: 0.01em; }
   </style>
 </head>
 <body>
@@ -108,6 +118,7 @@ export async function sendCampaignAction(
   ${pr.subtitle ? `<p class="subtitle">${pr.subtitle}</p>` : ''}
   <hr class="separator">
   <div class="body-content">${pr.body_html ?? ''}</div>
+  ${mediaPackBlock}
   ${signature ? `<div class="signature">${signature}</div>` : ''}
   <div class="footer">
     Vous recevez ce communiqué de presse en tant que journaliste professionnel.
