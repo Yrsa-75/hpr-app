@@ -291,8 +291,8 @@ function buildEmailHtml(pressRelease: PressReleaseRow, client: ClientInfo): stri
   ${pressRelease.subtitle ? `<p class="subtitle">${pressRelease.subtitle}</p>` : ''}
   <hr class="separator">
   <div class="body-content">${pressRelease.body_html ?? ''}</div>
-  ${signature ? `<div class="signature">${signature}</div>` : ''}
   ${mediaPackBlock}
+  ${signature ? `<div class="signature">${signature}</div>` : ''}
   <div class="footer">
     Vous recevez ce communiqué en tant que journaliste professionnel.<br>
     <a href="#" class="unsubscribe-btn">Se désinscrire</a>
