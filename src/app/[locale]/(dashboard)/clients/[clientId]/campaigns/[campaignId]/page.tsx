@@ -83,7 +83,7 @@ export default async function CampaignDetailPage({
   // Fetch client (with sender info)
   const { data: clientData } = await supabase
     .from('clients')
-    .select('name, sender_name, sender_email')
+    .select('name, slug, sender_name, sender_email')
     .eq('id', clientId)
     .single();
 
@@ -223,6 +223,7 @@ export default async function CampaignDetailPage({
         clippings={(clippings ?? []) as ClippingWithJoins[]}
         client={{
           name: clientData?.name ?? '',
+          slug: clientData?.slug ?? null,
           sender_name: clientData?.sender_name ?? null,
           sender_email: clientData?.sender_email ?? null,
         }}

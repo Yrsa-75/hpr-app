@@ -9,6 +9,7 @@ import type { PressReleaseRow, EmailSendRow } from '@/types/database';
 
 interface ClientInfo {
   name: string;
+  slug: string | null;
   sender_name: string | null;
   sender_email: string | null;
 }
@@ -105,41 +106,7 @@ export function SendingTab({ campaignId, pressRelease, emailSends, client }: Sen
 
       {/* Preview */}
       {pressRelease && (
-        <div className="space-y-2">
-          <h3 className="text-sm font-medium text-foreground">Aperçu de l&apos;email</h3>
-          <div className="border border-white/[0.08] rounded-xl overflow-hidden">
-            <div className="bg-white/[0.03] px-4 py-3 border-b border-white/[0.06] space-y-1">
-              <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                <span className="w-14 flex-shrink-0">De :</span>
-                <span className="text-foreground">
-                  {client.sender_email
-                    ? `${client.sender_name ?? client.name} <${client.sender_email}>`
-                    : <span className="text-red-400">Non configuré</span>}
-                </span>
-              </div>
-              <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                <span className="w-14 flex-shrink-0">Objet :</span>
-                <span className="text-foreground font-medium">
-                  {pressRelease.email_subject ?? <span className="text-amber-400">Non renseigné</span>}
-                </span>
-              </div>
-              {pressRelease.email_preview_text && (
-                <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                  <span className="w-14 flex-shrink-0">Preview :</span>
-                  <span className="text-muted-foreground/70 truncate">{pressRelease.email_preview_text}</span>
-                </div>
-              )}
-            </div>
-            {pressRelease.body_html && (
-              <div
-                className="p-4 text-xs text-muted-foreground max-h-48 overflow-y-auto prose prose-invert prose-xs"
-                dangerouslySetInnerHTML={{
-                  __html: pressRelease.body_html.slice(0, 1000) + (pressRelease.body_html.length > 1000 ? '...' : ''),
-                }}
-              />
-            )}
-          </div>
-        </div>
+        <EmailPreview pressRelease={pressRelease} client={client} />
       )}
 
       {/* Send button */}
@@ -277,6 +244,120 @@ function SendHistory({ sends }: { sends: EmailSendWithJoins[] }) {
             </div>
           );
         })}
+      </div>
+    </div>
+  );
+}
+
+function buildEmailHtml(pressRelease: PressReleaseRow, client: ClientInfo): string {
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://hermespressroom.com';
+  const mediaPackUrl = client.slug ? `${appUrl}/media/${client.slug}` : null;
+  const mediaPackBlock = mediaPackUrl
+    ? `<div class="media-pack">
+         <a href="${mediaPackUrl}">⬇ Télécharger le pack média associé à ce communiqué</a>
+       </div>`
+    : '';
+
+  return `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    body { font-family: Georgia, 'Times New Roman', serif; max-width: 680px; margin: 0 auto; padding: 32px 24px; color: #1a1a1a; background: #ffffff; }
+    h1 { font-size: 24px; font-weight: 700; margin: 0 0 8px; line-height: 1.3; color: #111; }
+    h2 { font-size: 18px; font-weight: 600; margin: 24px 0 8px; color: #111; }
+    h3 { font-size: 16px; font-weight: 600; margin: 20px 0 6px; color: #222; }
+    p { font-size: 15px; line-height: 1.75; margin: 0 0 14px; color: #333; }
+    .subtitle { font-size: 16px; color: #555; margin: 0 0 24px; font-style: italic; }
+    .separator { border: none; border-top: 2px solid #b8860b; margin: 24px 0; }
+    ul, ol { padding-left: 20px; margin: 0 0 14px; }
+    li { font-size: 15px; line-height: 1.75; color: #333; margin-bottom: 4px; }
+    strong { font-weight: 700; color: #111; }
+    em { font-style: italic; }
+    hr { border: none; border-top: 1px solid #e5e5e5; margin: 20px 0; }
+    .footer { margin-top: 32px; padding-top: 16px; border-top: 1px solid #e5e5e5; font-size: 11px; color: #999; }
+    .media-pack { margin-top: 28px; padding: 14px 18px; background: #fafaf7; border: 1px solid #e8e0c8; border-radius: 6px; text-align: center; }
+    .media-pack a { font-size: 13px; font-weight: 600; color: #b8860b; text-decoration: none; letter-spacing: 0.01em; }
+  </style>
+</head>
+<body>
+  <h1>${pressRelease.title ?? ''}</h1>
+  ${pressRelease.subtitle ? `<p class="subtitle">${pressRelease.subtitle}</p>` : ''}
+  <hr class="separator">
+  <div class="body-content">${pressRelease.body_html ?? ''}</div>
+  ${mediaPackBlock}
+  <div class="footer">
+    Vous recevez ce communiqué de presse en tant que journaliste professionnel.
+    Pour ne plus recevoir nos communiqués, répondez à cet email avec "STOP".
+  </div>
+</body>
+</html>`;
+}
+
+function EmailPreview({ pressRelease, client }: { pressRelease: PressReleaseRow; client: ClientInfo }) {
+  const [expanded, setExpanded] = React.useState(false);
+  const iframeRef = React.useRef<HTMLIFrameElement>(null);
+  const html = buildEmailHtml(pressRelease, client);
+
+  // Auto-resize iframe to content height
+  function handleIframeLoad() {
+    const iframe = iframeRef.current;
+    if (!iframe?.contentDocument?.body) return;
+    iframe.style.height = iframe.contentDocument.body.scrollHeight + 'px';
+  }
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between">
+        <h3 className="text-sm font-medium text-foreground">Aperçu de l&apos;email</h3>
+        <button
+          onClick={() => setExpanded((v) => !v)}
+          className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+        >
+          {expanded ? 'Réduire' : 'Agrandir'}
+        </button>
+      </div>
+
+      {/* En-tête email */}
+      <div className="rounded-t-xl border border-white/[0.08] bg-white/[0.03] px-4 py-3 space-y-1">
+        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+          <span className="w-14 flex-shrink-0">De :</span>
+          <span className="text-foreground">
+            {client.sender_email
+              ? `${client.sender_name ?? client.name} <${client.sender_email}>`
+              : <span className="text-red-400">Non configuré</span>}
+          </span>
+        </div>
+        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+          <span className="w-14 flex-shrink-0">Objet :</span>
+          <span className="text-foreground font-medium">
+            {pressRelease.email_subject ?? <span className="text-amber-400">Non renseigné</span>}
+          </span>
+        </div>
+        {pressRelease.email_preview_text && (
+          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+            <span className="w-14 flex-shrink-0">Preview :</span>
+            <span className="text-muted-foreground/70 truncate">{pressRelease.email_preview_text}</span>
+          </div>
+        )}
+      </div>
+
+      {/* Corps email en iframe */}
+      <div
+        className={`border-x border-b border-white/[0.08] rounded-b-xl overflow-hidden bg-white transition-all ${
+          expanded ? '' : 'max-h-[480px]'
+        }`}
+      >
+        <iframe
+          ref={iframeRef}
+          srcDoc={html}
+          title="Aperçu email"
+          className="w-full border-0"
+          style={{ minHeight: 200, height: expanded ? undefined : 480 }}
+          onLoad={expanded ? handleIframeLoad : undefined}
+          sandbox="allow-same-origin"
+        />
       </div>
     </div>
   );

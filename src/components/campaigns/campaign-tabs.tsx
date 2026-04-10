@@ -15,6 +15,7 @@ import type { ClippingWithJoins } from '@/app/[locale]/(dashboard)/clippings/pag
 
 interface ClientInfo {
   name: string;
+  slug: string | null;
   sender_name: string | null;
   sender_email: string | null;
 }
