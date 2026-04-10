@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { Search, UserCheck, AlertCircle } from 'lucide-react';
+import { Search, UserCheck, AlertCircle, X } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/components/ui/use-toast';
 import { toggleJournalistTargetAction } from '@/app/[locale]/(dashboard)/clients/[clientId]/campaigns/[campaignId]/targeting-actions';
@@ -37,23 +37,58 @@ export function TargetingTab({
     new Set(initialSelectedIds)
   );
 
-  // Notify parent of count changes
   React.useEffect(() => {
     onCountChange?.(selectedIds.size);
   }, [selectedIds, onCountChange]);
+
   const [search, setSearch] = React.useState('');
+  const [selectedMediaTypes, setSelectedMediaTypes] = React.useState<Set<string>>(new Set());
+  const [selectedBeats, setSelectedBeats] = React.useState<Set<string>>(new Set());
   const [pending, setPending] = React.useState<Set<string>>(new Set());
+
+  // Extraire les thématiques uniques de tous les journalistes
+  const allBeats = React.useMemo(() => {
+    const beats = new Set<string>();
+    journalists.forEach((j) => (j.beat ?? []).forEach((b) => beats.add(b)));
+    return Array.from(beats).sort((a, b) => a.localeCompare(b, 'fr'));
+  }, [journalists]);
+
+  const hasActiveFilters = selectedMediaTypes.size > 0 || selectedBeats.size > 0 || search;
 
   const filtered = journalists.filter((j) => {
     const q = search.toLowerCase();
-    return (
-      !q ||
+    if (q && !(
       j.first_name.toLowerCase().includes(q) ||
       j.last_name.toLowerCase().includes(q) ||
       (j.media_outlet ?? '').toLowerCase().includes(q) ||
       (j.beat ?? []).some((b) => b.toLowerCase().includes(q))
-    );
+    )) return false;
+    if (selectedMediaTypes.size > 0 && !selectedMediaTypes.has(j.media_type ?? '')) return false;
+    if (selectedBeats.size > 0 && !(j.beat ?? []).some((b) => selectedBeats.has(b))) return false;
+    return true;
   });
+
+  function toggleMediaType(type: string) {
+    setSelectedMediaTypes((prev) => {
+      const next = new Set(prev);
+      if (next.has(type)) next.delete(type); else next.add(type);
+      return next;
+    });
+  }
+
+  function toggleBeat(beat: string) {
+    setSelectedBeats((prev) => {
+      const next = new Set(prev);
+      if (next.has(beat)) next.delete(beat); else next.add(beat);
+      return next;
+    });
+  }
+
+  function clearFilters() {
+    setSearch('');
+    setSelectedMediaTypes(new Set());
+    setSelectedBeats(new Set());
+  }
 
   const handleToggle = async (journalistId: string) => {
     if (!pressReleaseId) return;
@@ -156,12 +191,79 @@ export function TargetingTab({
         />
       </div>
 
+      {/* Filtres */}
+      <div className="space-y-2.5">
+        {/* Type de média */}
+        <div className="space-y-1.5">
+          <p className="text-xs text-muted-foreground/70 font-medium uppercase tracking-wide">Type de média</p>
+          <div className="flex flex-wrap gap-1.5">
+            {Object.entries(MEDIA_TYPE_LABELS).map(([value, label]) => {
+              const active = selectedMediaTypes.has(value);
+              const count = journalists.filter((j) => j.media_type === value).length;
+              if (count === 0) return null;
+              return (
+                <button
+                  key={value}
+                  onClick={() => toggleMediaType(value)}
+                  className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium border transition-colors ${
+                    active
+                      ? 'bg-hpr-gold/15 border-hpr-gold/40 text-hpr-gold'
+                      : 'bg-white/[0.03] border-white/[0.08] text-muted-foreground hover:border-white/20 hover:text-foreground'
+                  }`}
+                >
+                  {label}
+                  <span className={`text-[10px] ${active ? 'text-hpr-gold/70' : 'text-muted-foreground/50'}`}>
+                    {count}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Thématiques */}
+        {allBeats.length > 0 && (
+          <div className="space-y-1.5">
+            <p className="text-xs text-muted-foreground/70 font-medium uppercase tracking-wide">Thématiques</p>
+            <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto pr-1">
+              {allBeats.map((beat) => {
+                const active = selectedBeats.has(beat);
+                return (
+                  <button
+                    key={beat}
+                    onClick={() => toggleBeat(beat)}
+                    className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium border transition-colors ${
+                      active
+                        ? 'bg-hpr-gold/15 border-hpr-gold/40 text-hpr-gold'
+                        : 'bg-white/[0.03] border-white/[0.08] text-muted-foreground hover:border-white/20 hover:text-foreground'
+                    }`}
+                  >
+                    {beat}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* Effacer les filtres */}
+        {hasActiveFilters && (
+          <button
+            onClick={clearFilters}
+            className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+          >
+            <X className="h-3 w-3" />
+            Effacer les filtres
+          </button>
+        )}
+      </div>
+
       {/* Journalist list */}
       {filtered.length === 0 ? (
         <div className="text-center py-12 text-sm text-muted-foreground">
           {journalists.length === 0
             ? 'Aucun journaliste dans votre base. Commencez par en importer.'
-            : 'Aucun résultat pour cette recherche.'}
+            : 'Aucun journaliste ne correspond à ces filtres.'}
         </div>
       ) : (
         <div className="divide-y divide-white/[0.04] rounded-xl border border-white/[0.08] overflow-hidden">
