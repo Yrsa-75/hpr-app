@@ -23,8 +23,8 @@ const protectedPaths = [
 export async function middleware(request: NextRequest) {
   const { pathname, searchParams, origin } = request.nextUrl;
 
-  // Public media pack pages — no auth, no intl redirect
-  if (pathname.startsWith('/media/')) {
+  // Public pages — no auth, no intl redirect
+  if (pathname.startsWith('/media/') || pathname.startsWith('/unsubscribe')) {
     return NextResponse.next();
   }
 

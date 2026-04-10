@@ -85,6 +85,7 @@ export async function sendCampaignAction(
            <a href="${mediaPackUrl}">⬇ Télécharger le pack média associé à ce communiqué</a>
          </div>`
       : '';
+    const unsubscribeUrl = `${appUrl}/unsubscribe?send=${send.id}`;
 
     const html = `
 <!DOCTYPE html>
@@ -106,7 +107,8 @@ export async function sendCampaignAction(
     strong { font-weight: 700; color: #111; }
     em { font-style: italic; }
     hr { border: none; border-top: 1px solid #e5e5e5; margin: 20px 0; }
-    .footer { margin-top: 32px; padding-top: 16px; border-top: 1px solid #e5e5e5; font-size: 11px; color: #999; }
+    .footer { margin-top: 32px; padding-top: 16px; border-top: 1px solid #e5e5e5; font-size: 11px; color: #999; text-align: center; }
+    .unsubscribe-btn { display: inline-block; margin-top: 8px; padding: 6px 16px; border: 1px solid #d1d5db; border-radius: 4px; font-size: 11px; color: #6b7280; text-decoration: none; }
     .signature { margin-top: 28px; padding-top: 16px; border-top: 1px solid #e5e5e5; }
     .media-pack { margin-top: 28px; padding: 14px 18px; background: #fafaf7; border: 1px solid #e8e0c8; border-radius: 6px; text-align: center; }
     .media-pack a { font-size: 13px; font-weight: 600; color: #b8860b; text-decoration: none; letter-spacing: 0.01em; }
@@ -121,8 +123,8 @@ export async function sendCampaignAction(
   ${mediaPackBlock}
   ${signature ? `<div class="signature">${signature}</div>` : ''}
   <div class="footer">
-    Vous recevez ce communiqué de presse en tant que journaliste professionnel.
-    Pour ne plus recevoir nos communiqués, répondez à cet email avec "STOP".
+    Vous recevez ce communiqué en tant que journaliste professionnel.<br>
+    <a href="${unsubscribeUrl}" class="unsubscribe-btn">Se désinscrire</a>
   </div>
 </body>
 </html>`;
