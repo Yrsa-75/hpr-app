@@ -111,7 +111,9 @@ export default async function CampaignDetailPage({
     .eq('campaign_id', campaignId)
     .order('sent_at', { ascending: false });
 
-  const selectedJournalistIds = (emailSends ?? []).map((s: { journalist_id: string }) => s.journalist_id);
+  const selectedJournalistIds = (emailSends ?? [])
+    .filter((s: { status: string }) => s.status === 'queued')
+    .map((s: { journalist_id: string }) => s.journalist_id);
 
   // Fetch email threads with journalist info and messages (same shape as inbox)
   const { data: rawThreads } = await supabase
