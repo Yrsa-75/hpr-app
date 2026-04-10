@@ -54,51 +54,72 @@ export type MediaActionState = {
   error?: string;
 };
 
-export async function uploadMediaAssetAction(
+export type SignedUploadUrlResult = {
+  success: boolean;
+  error?: string;
+  signedUrl?: string;
+  path?: string;
+  publicUrl?: string;
+};
+
+/** Étape 1 : génère une URL signée pour upload direct depuis le browser */
+export async function getSignedUploadUrlAction(
   clientId: string,
-  formData: FormData
-): Promise<MediaActionState> {
+  fileName: string,
+  fileSize: number
+): Promise<SignedUploadUrlResult> {
+  if (fileSize > 50 * 1024 * 1024) {
+    return { success: false, error: 'Fichier trop volumineux (max 50 Mo)' };
+  }
+
   const ctx = await getOrgAndClient(clientId);
   if (!ctx) return { success: false, error: 'Non autorisé' };
-
-  const file = formData.get('file') as File | null;
-  const displayName = (formData.get('display_name') as string | null)?.trim();
-
-  if (!file || file.size === 0) return { success: false, error: 'Fichier manquant' };
-  if (!displayName) return { success: false, error: 'Nom du fichier requis' };
 
   await ensureBucket();
 
   const serviceClient = createServiceClient();
-  const ext = file.name.split('.').pop() ?? 'bin';
-  const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+  const safeName = fileName.replace(/[^a-zA-Z0-9._-]/g, '_');
   const path = `${clientId}/${Date.now()}-${safeName}`;
-  const buffer = Buffer.from(await file.arrayBuffer());
 
-  const { error: uploadError } = await serviceClient.storage
+  const { data, error } = await serviceClient.storage
     .from(BUCKET)
-    .upload(path, buffer, { contentType: file.type, upsert: false });
+    .createSignedUploadUrl(path);
 
-  if (uploadError) return { success: false, error: 'Erreur upload : ' + uploadError.message };
+  if (error || !data) {
+    return { success: false, error: 'Impossible de générer l\'URL d\'upload' };
+  }
 
-  const {
-    data: { publicUrl },
-  } = serviceClient.storage.from(BUCKET).getPublicUrl(path);
+  const { data: { publicUrl } } = serviceClient.storage.from(BUCKET).getPublicUrl(path);
 
-  const { error: dbError } = await serviceClient.from('client_media_assets').insert({
+  return { success: true, signedUrl: data.signedUrl, path, publicUrl };
+}
+
+/** Étape 2 : enregistre le fichier en DB après upload direct */
+export async function registerMediaAssetAction(
+  clientId: string,
+  payload: {
+    fileName: string;
+    displayName: string;
+    fileUrl: string;
+    fileSize: number;
+    mimeType: string;
+  }
+): Promise<MediaActionState> {
+  const ctx = await getOrgAndClient(clientId);
+  if (!ctx) return { success: false, error: 'Non autorisé' };
+
+  const serviceClient = createServiceClient();
+  const { error } = await serviceClient.from('client_media_assets').insert({
     client_id: clientId,
     organization_id: ctx.organizationId,
-    file_name: file.name,
-    display_name: displayName,
-    file_url: publicUrl,
-    file_size: file.size,
-    mime_type: file.type,
+    file_name: payload.fileName,
+    display_name: payload.displayName,
+    file_url: payload.fileUrl,
+    file_size: payload.fileSize,
+    mime_type: payload.mimeType,
   });
 
-  if (dbError) {
-    await serviceClient.storage.from(BUCKET).remove([path]);
-    return { success: false, error: 'Erreur base de données' };
-  }
+  if (error) return { success: false, error: 'Erreur base de données' };
 
   revalidatePath(`/fr/clients/${clientId}`);
   return { success: true };

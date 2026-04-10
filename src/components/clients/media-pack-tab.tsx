@@ -19,7 +19,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/components/ui/use-toast';
 import {
-  uploadMediaAssetAction,
+  getSignedUploadUrlAction,
+  registerMediaAssetAction,
   deleteMediaAssetAction,
 } from '@/app/[locale]/(dashboard)/clients/[clientId]/media-actions';
 import type { ClientMediaAssetRow } from '@/types/database';
@@ -45,14 +46,41 @@ function formatBytes(bytes: number | null) {
   return `${(bytes / (1024 * 1024)).toFixed(1)} Mo`;
 }
 
+/** Upload direct vers Supabase Storage via URL signée avec suivi progression XHR */
+function uploadWithProgress(
+  signedUrl: string,
+  file: File,
+  onProgress: (pct: number) => void
+): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open('PUT', signedUrl);
+    xhr.setRequestHeader('Content-Type', file.type);
+    xhr.upload.addEventListener('progress', (e) => {
+      if (e.lengthComputable) {
+        onProgress(Math.round((e.loaded / e.total) * 100));
+      }
+    });
+    xhr.addEventListener('load', () => {
+      if (xhr.status >= 200 && xhr.status < 300) resolve();
+      else reject(new Error(`Erreur HTTP ${xhr.status}`));
+    });
+    xhr.addEventListener('error', () => reject(new Error('Erreur réseau')));
+    xhr.send(file);
+  });
+}
+
 export function MediaPackTab({ clientId, clientSlug, assets }: MediaPackTabProps) {
   const { toast } = useToast();
-  const [isUploading, setIsUploading] = React.useState(false);
+  const [uploadProgress, setUploadProgress] = React.useState<number | null>(null);
+  const [uploadStep, setUploadStep] = React.useState<'idle' | 'signing' | 'uploading' | 'saving'>('idle');
   const [deletingId, setDeletingId] = React.useState<string | null>(null);
   const [copied, setCopied] = React.useState(false);
   const [displayName, setDisplayName] = React.useState('');
   const [selectedFile, setSelectedFile] = React.useState<File | null>(null);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
+
+  const isUploading = uploadStep !== 'idle';
 
   const publicUrl = clientSlug
     ? `${process.env.NEXT_PUBLIC_APP_URL}/media/${clientSlug}`
@@ -62,7 +90,6 @@ export function MediaPackTab({ clientId, clientSlug, assets }: MediaPackTabProps
     const file = e.target.files?.[0] ?? null;
     setSelectedFile(file);
     if (file && !displayName) {
-      // Auto-fill display name from filename (without extension)
       setDisplayName(file.name.replace(/\.[^.]+$/, ''));
     }
   }
@@ -71,21 +98,43 @@ export function MediaPackTab({ clientId, clientSlug, assets }: MediaPackTabProps
     e.preventDefault();
     if (!selectedFile) return;
 
-    setIsUploading(true);
-    const formData = new FormData();
-    formData.set('file', selectedFile);
-    formData.set('display_name', displayName.trim() || selectedFile.name);
+    const name = displayName.trim() || selectedFile.name;
 
-    const result = await uploadMediaAssetAction(clientId, formData);
-    setIsUploading(false);
+    try {
+      // Étape 1 : obtenir l'URL signée
+      setUploadStep('signing');
+      const signed = await getSignedUploadUrlAction(clientId, selectedFile.name, selectedFile.size);
+      if (!signed.success || !signed.signedUrl || !signed.publicUrl) {
+        throw new Error(signed.error ?? 'Erreur génération URL');
+      }
 
-    if (result.success) {
+      // Étape 2 : upload direct avec progression
+      setUploadStep('uploading');
+      setUploadProgress(0);
+      await uploadWithProgress(signed.signedUrl, selectedFile, setUploadProgress);
+
+      // Étape 3 : enregistrement DB
+      setUploadStep('saving');
+      const result = await registerMediaAssetAction(clientId, {
+        fileName: selectedFile.name,
+        displayName: name,
+        fileUrl: signed.publicUrl,
+        fileSize: selectedFile.size,
+        mimeType: selectedFile.type,
+      });
+
+      if (!result.success) throw new Error(result.error ?? 'Erreur enregistrement');
+
       toast({ title: 'Fichier ajouté au pack média' });
       setSelectedFile(null);
       setDisplayName('');
       if (fileInputRef.current) fileInputRef.current.value = '';
-    } else {
-      toast({ title: result.error ?? 'Erreur upload', variant: 'destructive' });
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Erreur inconnue';
+      toast({ title: message, variant: 'destructive' });
+    } finally {
+      setUploadStep('idle');
+      setUploadProgress(null);
     }
   }
 
@@ -105,6 +154,13 @@ export function MediaPackTab({ clientId, clientSlug, assets }: MediaPackTabProps
     await navigator.clipboard.writeText(publicUrl);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  }
+
+  function uploadStatusLabel() {
+    if (uploadStep === 'signing') return 'Préparation...';
+    if (uploadStep === 'uploading') return `Upload ${uploadProgress ?? 0}%`;
+    if (uploadStep === 'saving') return 'Enregistrement...';
+    return '';
   }
 
   return (
@@ -163,7 +219,8 @@ export function MediaPackTab({ clientId, clientSlug, assets }: MediaPackTabProps
               type="file"
               accept="image/*,application/pdf,application/zip,application/x-zip-compressed,video/*"
               onChange={handleFileChange}
-              className="bg-white/[0.03] border-white/[0.08] focus:border-hpr-gold/50 text-sm file:mr-3 file:text-xs file:border-0 file:bg-white/10 file:text-foreground file:rounded file:px-2 file:py-1 cursor-pointer"
+              disabled={isUploading}
+              className="bg-white/[0.03] border-white/[0.08] focus:border-hpr-gold/50 text-sm file:mr-3 file:text-xs file:border-0 file:bg-white/10 file:text-foreground file:rounded file:px-2 file:py-1 cursor-pointer disabled:opacity-50"
             />
           </div>
           <div className="space-y-1.5">
@@ -175,9 +232,36 @@ export function MediaPackTab({ clientId, clientSlug, assets }: MediaPackTabProps
               value={displayName}
               onChange={(e) => setDisplayName(e.target.value)}
               placeholder="ex : Logo HD, Dossier de presse, Photos produit..."
-              className="bg-white/[0.03] border-white/[0.08] focus:border-hpr-gold/50 text-sm"
+              disabled={isUploading}
+              className="bg-white/[0.03] border-white/[0.08] focus:border-hpr-gold/50 text-sm disabled:opacity-50"
             />
           </div>
+
+          {/* Barre de progression */}
+          {isUploading && (
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between text-xs text-muted-foreground">
+                <span>{uploadStatusLabel()}</span>
+                {uploadStep === 'uploading' && (
+                  <span className="font-medium text-hpr-gold">{uploadProgress}%</span>
+                )}
+              </div>
+              <div className="h-1.5 w-full rounded-full bg-white/[0.06] overflow-hidden">
+                <div
+                  className="h-full rounded-full bg-hpr-gold transition-all duration-150"
+                  style={{
+                    width:
+                      uploadStep === 'signing'
+                        ? '5%'
+                        : uploadStep === 'uploading'
+                        ? `${uploadProgress ?? 0}%`
+                        : '100%',
+                  }}
+                />
+              </div>
+            </div>
+          )}
+
           <Button
             type="submit"
             variant="gold"
@@ -188,7 +272,7 @@ export function MediaPackTab({ clientId, clientSlug, assets }: MediaPackTabProps
             {isUploading ? (
               <>
                 <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
-                Upload en cours...
+                {uploadStatusLabel()}
               </>
             ) : (
               <>
