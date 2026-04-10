@@ -64,7 +64,8 @@ export function SendingTab({ campaignId, pressRelease, emailSends, client }: Sen
         setResult({ sent: res.sent ?? 0, failed: res.failed ?? 0 });
         toast({
           title: 'Envoi terminé',
-          description: `${res.sent} email${(res.sent ?? 0) > 1 ? 's' : ''} envoyé${(res.sent ?? 0) > 1 ? 's' : ''}${res.failed ? `, ${res.failed} échec(s)` : ''}.`,
+          description: `${res.sent} email${(res.sent ?? 0) > 1 ? 's' : ''} envoyé${(res.sent ?? 0) > 1 ? 's' : ''}${res.failed ? `, ${res.failed} échec(s)` : ''}.${res.lastError ? ` Erreur : ${res.lastError}` : ''}`,
+          variant: (res.failed ?? 0) > 0 && (res.sent ?? 0) === 0 ? 'destructive' : 'default',
         });
       } else {
         toast({ title: 'Erreur', description: res.error, variant: 'destructive' });

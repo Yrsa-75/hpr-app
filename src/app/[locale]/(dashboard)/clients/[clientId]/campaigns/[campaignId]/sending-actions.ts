@@ -8,6 +8,7 @@ export type SendCampaignResult = {
   error?: string;
   sent?: number;
   failed?: number;
+  lastError?: string;
 };
 
 export async function sendCampaignAction(
@@ -65,11 +66,14 @@ export async function sendCampaignAction(
 
   let sent = 0;
   let failed = 0;
+  let lastError: string | undefined;
 
   for (const send of sends) {
     const journalist = (send as any).journalists;
     if (!journalist?.email) {
       failed++;
+      lastError = `Journaliste introuvable ou email manquant (send_id: ${send.id})`;
+      console.error('[HPR send]', lastError);
       await supabase.from('email_sends').update({ status: 'failed' }).eq('id', send.id);
       continue;
     }
@@ -145,6 +149,8 @@ export async function sendCampaignAction(
 
       if (result.error) {
         failed++;
+        lastError = `Resend error: ${result.error.message ?? JSON.stringify(result.error)}`;
+        console.error('[HPR send]', lastError, { to: journalist.email, from: fromEmail });
         await supabase.from('email_sends').update({ status: 'failed' }).eq('id', send.id);
       } else {
         sent++;
@@ -154,8 +160,10 @@ export async function sendCampaignAction(
           sent_at: new Date().toISOString(),
         }).eq('id', send.id);
       }
-    } catch {
+    } catch (err: unknown) {
       failed++;
+      lastError = err instanceof Error ? err.message : String(err);
+      console.error('[HPR send] Exception:', lastError, { to: journalist.email, from: fromEmail });
       await supabase.from('email_sends').update({ status: 'failed' }).eq('id', send.id);
     }
   }
@@ -169,5 +177,5 @@ export async function sendCampaignAction(
   }
 
   revalidatePath(`/[locale]/(dashboard)/clients/[clientId]/campaigns/[campaignId]`, 'page');
-  return { success: true, sent, failed };
+  return { success: true, sent, failed, lastError };
 }
