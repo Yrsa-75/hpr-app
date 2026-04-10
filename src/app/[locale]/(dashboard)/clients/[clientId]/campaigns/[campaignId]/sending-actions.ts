@@ -58,8 +58,10 @@ export async function sendCampaignAction(
     return { success: false, error: 'Aucun journaliste ciblé' };
   }
 
-  const apiKey = process.env.RESEND_API_KEY;
+  const apiKey = process.env.RESEND_API_KEY?.trim();
   if (!apiKey) return { success: false, error: 'Clé API Resend non configurée' };
+
+  console.log('[HPR send] API key prefix:', apiKey.substring(0, 8), '| length:', apiKey.length, '| from:', fromEmail);
 
   const { Resend } = await import('resend');
   const resend = new Resend(apiKey);
@@ -149,8 +151,8 @@ export async function sendCampaignAction(
 
       if (result.error) {
         failed++;
-        lastError = `Resend error: ${result.error.message ?? JSON.stringify(result.error)}`;
-        console.error('[HPR send]', lastError, { to: journalist.email, from: fromEmail });
+        lastError = `Resend error: ${JSON.stringify(result.error)}`;
+        console.error('[HPR send] Resend error full object:', JSON.stringify(result.error), { to: journalist.email, from: fromEmail });
         await supabase.from('email_sends').update({ status: 'failed' }).eq('id', send.id);
       } else {
         sent++;

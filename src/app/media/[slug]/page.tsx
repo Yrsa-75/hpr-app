@@ -21,9 +21,9 @@ export async function generateMetadata({
 
 function fileIcon(mimeType: string | null) {
   if (!mimeType) return <File className="h-5 w-5 text-gray-400" />;
-  if (mimeType.startsWith('image/')) return <Image className="h-5 w-5 text-blue-400" />;
-  if (mimeType === 'application/pdf') return <FileText className="h-5 w-5 text-red-400" />;
-  if (mimeType.includes('zip')) return <FileArchive className="h-5 w-5 text-yellow-400" />;
+  if (mimeType.startsWith('image/')) return <Image className="h-5 w-5 text-blue-500" />;
+  if (mimeType === 'application/pdf') return <FileText className="h-5 w-5 text-red-500" />;
+  if (mimeType.includes('zip')) return <FileArchive className="h-5 w-5 text-amber-500" />;
   return <File className="h-5 w-5 text-gray-400" />;
 }
 
@@ -66,17 +66,14 @@ export default async function MediaPackPage({
   })();
 
   return (
-    <div className="min-h-screen bg-[#0a0a0b] text-white">
+    <div className="min-h-screen bg-[#FAFAF9] text-gray-900">
       {/* Header bar */}
-      <header className="border-b border-white/[0.06] bg-[#0d0d0f]">
+      <header className="border-b border-gray-200 bg-white">
         <div className="max-w-3xl mx-auto px-6 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            {/* HPR logo / attribution */}
-            <span className="text-xs text-white/30 font-medium tracking-widest uppercase">
-              Hermès Press Room
-            </span>
-          </div>
-          <span className="text-xs text-white/20">Pack Média</span>
+          <span className="text-xs text-gray-400 font-medium tracking-widest uppercase">
+            Hermès Press Room
+          </span>
+          <span className="text-xs text-gray-400">Pack Média</span>
         </div>
       </header>
 
@@ -88,18 +85,18 @@ export default async function MediaPackPage({
             <img
               src={client.logo_url}
               alt={client.name}
-              className="h-20 w-20 rounded-2xl object-cover flex-shrink-0 border border-white/10"
+              className="h-20 w-20 rounded-2xl object-cover flex-shrink-0 border border-gray-200"
             />
           ) : (
-            <div className="h-20 w-20 rounded-2xl flex items-center justify-center flex-shrink-0 bg-[#B8860B]/20 border border-[#B8860B]/30">
+            <div className="h-20 w-20 rounded-2xl flex items-center justify-center flex-shrink-0 bg-[#B8860B]/10 border border-[#B8860B]/20">
               <span className="text-2xl font-bold text-[#B8860B]">{initials}</span>
             </div>
           )}
           <div className="space-y-2 pt-1">
-            <h1 className="text-3xl font-bold tracking-tight">{client.name}</h1>
+            <h1 className="text-3xl font-bold tracking-tight text-gray-900">{client.name}</h1>
             <div className="flex items-center gap-3 flex-wrap">
               {client.industry && (
-                <span className="text-xs px-2.5 py-1 rounded-full bg-white/5 border border-white/10 text-white/50">
+                <span className="text-xs px-2.5 py-1 rounded-full bg-gray-100 border border-gray-200 text-gray-500">
                   {client.industry}
                 </span>
               )}
@@ -108,7 +105,7 @@ export default async function MediaPackPage({
                   href={client.website}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1 text-xs text-white/40 hover:text-[#B8860B] transition-colors"
+                  className="inline-flex items-center gap-1 text-xs text-gray-400 hover:text-[#B8860B] transition-colors"
                 >
                   <Globe className="h-3 w-3" />
                   {client.website.replace(/^https?:\/\//, '')}
@@ -117,7 +114,7 @@ export default async function MediaPackPage({
               )}
             </div>
             {client.description && (
-              <p className="text-sm text-white/50 leading-relaxed max-w-xl">
+              <p className="text-sm text-gray-500 leading-relaxed max-w-xl">
                 {client.description}
               </p>
             )}
@@ -125,20 +122,20 @@ export default async function MediaPackPage({
         </div>
 
         {/* Divider */}
-        <div className="border-t border-white/[0.06]" />
+        <div className="border-t border-gray-200" />
 
         {/* Downloads */}
         <div className="space-y-4">
           <div>
-            <h2 className="text-lg font-semibold text-white">Ressources disponibles</h2>
-            <p className="text-sm text-white/40 mt-1">
+            <h2 className="text-lg font-semibold text-gray-900">Ressources disponibles</h2>
+            <p className="text-sm text-gray-400 mt-1">
               Téléchargez librement les éléments visuels et documents ci-dessous.
             </p>
           </div>
 
           {assetList.length === 0 ? (
-            <div className="rounded-2xl border border-white/[0.06] border-dashed p-14 text-center">
-              <p className="text-sm text-white/30">Aucune ressource disponible pour le moment.</p>
+            <div className="rounded-2xl border border-gray-200 border-dashed p-14 text-center">
+              <p className="text-sm text-gray-400">Aucune ressource disponible pour le moment.</p>
             </div>
           ) : (
             <div className="space-y-2">
@@ -149,18 +146,18 @@ export default async function MediaPackPage({
                   target="_blank"
                   rel="noopener noreferrer"
                   download
-                  className="group flex items-center gap-4 rounded-xl border border-white/[0.06] bg-white/[0.02] hover:bg-white/[0.05] hover:border-[#B8860B]/30 px-5 py-4 transition-all"
+                  className="group flex items-center gap-4 rounded-xl border border-gray-200 bg-white hover:border-[#B8860B]/40 hover:shadow-sm px-5 py-4 transition-all"
                 >
                   <div className="flex-shrink-0">{fileIcon(asset.mime_type)}</div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-white group-hover:text-[#B8860B] transition-colors truncate">
+                    <p className="text-sm font-medium text-gray-800 group-hover:text-[#B8860B] transition-colors truncate">
                       {asset.display_name}
                     </p>
                     {asset.file_size && (
-                      <p className="text-xs text-white/30 mt-0.5">{formatBytes(asset.file_size)}</p>
+                      <p className="text-xs text-gray-400 mt-0.5">{formatBytes(asset.file_size)}</p>
                     )}
                   </div>
-                  <div className="flex-shrink-0 flex items-center gap-1.5 text-xs text-white/30 group-hover:text-[#B8860B] transition-colors">
+                  <div className="flex-shrink-0 flex items-center gap-1.5 text-xs text-gray-400 group-hover:text-[#B8860B] transition-colors">
                     <Download className="h-4 w-4" />
                     <span>Télécharger</span>
                   </div>
@@ -171,14 +168,14 @@ export default async function MediaPackPage({
         </div>
 
         {/* Footer */}
-        <div className="border-t border-white/[0.06] pt-6 text-center">
-          <p className="text-xs text-white/20">
+        <div className="border-t border-gray-200 pt-6 text-center">
+          <p className="text-xs text-gray-400">
             Pack média généré via{' '}
             <a
               href="https://hermespressroom.com"
               target="_blank"
               rel="noopener noreferrer"
-              className="hover:text-white/40 transition-colors"
+              className="hover:text-gray-600 transition-colors"
             >
               Hermès Press Room
             </a>
