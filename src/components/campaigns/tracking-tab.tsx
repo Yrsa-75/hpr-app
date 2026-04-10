@@ -2,11 +2,14 @@
 
 import * as React from 'react';
 import { useRouter } from 'next/navigation';
-import { Mail, Eye, MousePointer, XCircle, AlertTriangle, Clock, RefreshCw } from 'lucide-react';
+import { Mail, Eye, MousePointer, XCircle, AlertTriangle, Clock, RefreshCw, Trash2 } from 'lucide-react';
 import type { EmailSendWithJoins } from '@/components/campaigns/sending-tab';
+import { deleteEmailSendsAction } from '@/app/[locale]/(dashboard)/clients/[clientId]/campaigns/[campaignId]/actions';
+import { useToast } from '@/components/ui/use-toast';
 
 interface TrackingTabProps {
   emailSends: EmailSendWithJoins[];
+  campaignId: string;
 }
 
 function StatCard({
@@ -50,15 +53,17 @@ function StatCard({
   );
 }
 
-export function TrackingTab({ emailSends }: TrackingTabProps) {
+export function TrackingTab({ emailSends, campaignId }: TrackingTabProps) {
   const router = useRouter();
+  const { toast } = useToast();
   const [isRefreshing, setIsRefreshing] = React.useState(false);
   const [lastRefresh, setLastRefresh] = React.useState<Date>(new Date());
+  const [selectedIds, setSelectedIds] = React.useState<Set<string>>(new Set());
+  const [isDeleting, setIsDeleting] = React.useState(false);
 
   const sent = emailSends.filter((s) => s.status !== 'queued');
   const total = sent.length;
 
-  // Has any email that hasn't been opened yet (could receive an open event)
   const hasPending = sent.some((s) => s.status === 'sent' || s.status === 'delivered');
 
   const refresh = React.useCallback(() => {
@@ -68,12 +73,41 @@ export function TrackingTab({ emailSends }: TrackingTabProps) {
     setTimeout(() => setIsRefreshing(false), 1000);
   }, [router]);
 
-  // Auto-refresh every 30s while there are pending (sent/delivered) emails
   React.useEffect(() => {
     if (!hasPending) return;
     const interval = setInterval(refresh, 30_000);
     return () => clearInterval(interval);
   }, [hasPending, refresh]);
+
+  const toggleSelect = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedIds.size === sent.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(sent.map((s) => s.id)));
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!selectedIds.size) return;
+    setIsDeleting(true);
+    const result = await deleteEmailSendsAction(campaignId, Array.from(selectedIds));
+    setIsDeleting(false);
+    if (result.success) {
+      setSelectedIds(new Set());
+      toast({ title: `${selectedIds.size} envoi${selectedIds.size > 1 ? 's' : ''} supprimé${selectedIds.size > 1 ? 's' : ''}` });
+      router.refresh();
+    } else {
+      toast({ title: 'Erreur', description: result.error, variant: 'destructive' });
+    }
+  };
 
   if (total === 0) {
     return (
@@ -96,6 +130,9 @@ export function TrackingTab({ emailSends }: TrackingTabProps) {
     bounced: sent.filter((s) => s.status === 'bounced').length,
     complained: sent.filter((s) => s.status === 'complained').length,
   };
+
+  const allSelected = selectedIds.size === sent.length && sent.length > 0;
+  const someSelected = selectedIds.size > 0;
 
   return (
     <div className="space-y-6 py-4">
@@ -132,9 +169,41 @@ export function TrackingTab({ emailSends }: TrackingTabProps) {
 
       {/* Per-journalist table */}
       <div className="space-y-2">
-        <h3 className="text-sm font-medium text-foreground">Détail par journaliste</h3>
+        <div className="flex items-center justify-between">
+          <h3 className="text-sm font-medium text-foreground">Détail par journaliste</h3>
+          {someSelected && (
+            <button
+              onClick={handleDelete}
+              disabled={isDeleting}
+              className="flex items-center gap-1.5 text-xs text-red-400 hover:text-red-300 transition-colors disabled:opacity-50"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+              Supprimer {selectedIds.size} sélectionné{selectedIds.size > 1 ? 's' : ''}
+            </button>
+          )}
+        </div>
         <div className="rounded-xl border border-white/[0.08] overflow-hidden">
-          <div className="grid grid-cols-[1fr_auto_auto_auto] text-xs text-muted-foreground bg-white/[0.02] px-4 py-2 border-b border-white/[0.06]">
+          <div className="grid grid-cols-[auto_1fr_auto_auto_auto] text-xs text-muted-foreground bg-white/[0.02] px-4 py-2 border-b border-white/[0.06] items-center gap-3">
+            {/* Select all checkbox */}
+            <div
+              onClick={toggleSelectAll}
+              className={`h-4 w-4 rounded border flex-shrink-0 flex items-center justify-center cursor-pointer transition-colors ${
+                allSelected
+                  ? 'bg-red-500/80 border-red-500/80'
+                  : someSelected
+                  ? 'bg-red-500/30 border-red-500/50'
+                  : 'border-white/20 bg-transparent hover:border-white/40'
+              }`}
+            >
+              {(allSelected || someSelected) && (
+                <svg className="h-2.5 w-2.5 text-white" viewBox="0 0 10 10" fill="none">
+                  {allSelected
+                    ? <path d="M1.5 5L4 7.5L8.5 2.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                    : <path d="M2 5h6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                  }
+                </svg>
+              )}
+            </div>
             <span>Journaliste</span>
             <span className="w-24 text-center">Envoyé le</span>
             <span className="w-20 text-center">Ouverture</span>
@@ -143,6 +212,7 @@ export function TrackingTab({ emailSends }: TrackingTabProps) {
           <div className="divide-y divide-white/[0.04]">
             {sent.map((s) => {
               const j = s.journalists;
+              const isSelected = selectedIds.has(s.id);
               const statusConfig: Record<string, { label: string; color: string }> = {
                 sent: { label: 'Envoyé', color: 'text-blue-400' },
                 delivered: { label: 'Délivré', color: 'text-blue-400' },
@@ -155,7 +225,28 @@ export function TrackingTab({ emailSends }: TrackingTabProps) {
               const cfg = statusConfig[s.status] ?? statusConfig.sent;
 
               return (
-                <div key={s.id} className="grid grid-cols-[1fr_auto_auto_auto] items-center px-4 py-3 bg-white/[0.01] hover:bg-white/[0.03] transition-colors">
+                <div
+                  key={s.id}
+                  className={`grid grid-cols-[auto_1fr_auto_auto_auto] items-center px-4 py-3 transition-colors gap-3 ${
+                    isSelected ? 'bg-red-500/5' : 'bg-white/[0.01] hover:bg-white/[0.03]'
+                  }`}
+                >
+                  {/* Checkbox */}
+                  <div
+                    onClick={() => toggleSelect(s.id)}
+                    className={`h-4 w-4 rounded border flex-shrink-0 flex items-center justify-center cursor-pointer transition-colors ${
+                      isSelected
+                        ? 'bg-red-500/80 border-red-500/80'
+                        : 'border-white/20 bg-transparent hover:border-white/40'
+                    }`}
+                  >
+                    {isSelected && (
+                      <svg className="h-2.5 w-2.5 text-white" viewBox="0 0 10 10" fill="none">
+                        <path d="M1.5 5L4 7.5L8.5 2.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                    )}
+                  </div>
+
                   <div className="min-w-0">
                     <p className="text-xs font-medium text-foreground truncate">
                       {j ? `${j.first_name} ${j.last_name}` : '—'}

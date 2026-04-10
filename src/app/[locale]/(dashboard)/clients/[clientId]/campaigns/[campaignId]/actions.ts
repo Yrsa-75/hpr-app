@@ -3,6 +3,40 @@
 import { revalidatePath } from 'next/cache';
 import { createClient } from '@/lib/supabase/server';
 
+export async function deleteEmailSendsAction(
+  campaignId: string,
+  sendIds: string[]
+): Promise<{ success: boolean; error?: string }> {
+  if (!sendIds.length) return { success: true };
+
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { success: false, error: 'Unauthorized' };
+
+  const { error } = await supabase
+    .from('email_sends')
+    .delete()
+    .in('id', sendIds)
+    .eq('campaign_id', campaignId);
+
+  if (error) return { success: false, error: error.message };
+
+  // Recalculate total_sent from remaining sent rows
+  const { count } = await supabase
+    .from('email_sends')
+    .select('*', { count: 'exact', head: true })
+    .eq('campaign_id', campaignId)
+    .in('status', ['sent', 'delivered', 'opened', 'clicked']);
+
+  await supabase
+    .from('campaigns')
+    .update({ total_sent: count ?? 0 })
+    .eq('id', campaignId);
+
+  revalidatePath(`/[locale]/(dashboard)/clients/[clientId]/campaigns/[campaignId]`, 'page');
+  return { success: true };
+}
+
 export type PressReleaseFormState = {
   success: boolean;
   error?: string;

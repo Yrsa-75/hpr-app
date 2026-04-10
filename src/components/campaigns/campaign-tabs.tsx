@@ -127,7 +127,7 @@ export function CampaignTabs({
       </TabsContent>
 
       <TabsContent value="tracking">
-        <TrackingTab emailSends={emailSends} />
+        <TrackingTab emailSends={emailSends} campaignId={campaignId} />
       </TabsContent>
 
       <TabsContent value="replies">
