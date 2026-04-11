@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import { useTranslations } from 'next-intl';
-import { Search, Pencil, Trash2, Loader2, Tag, X } from 'lucide-react';
+import { Search, Pencil, Trash2, Loader2, Tag, X, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
 
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -78,6 +78,8 @@ export function JournalistsTable({ journalists }: JournalistsTableProps) {
   const [mediaTypeFilter, setMediaTypeFilter] = React.useState('all');
   const [selectedTags, setSelectedTags] = React.useState<string[]>([]);
   const [tagPopoverOpen, setTagPopoverOpen] = React.useState(false);
+  const [sortCol, setSortCol] = React.useState<'name' | 'media' | 'type' | 'score' | 'last_contacted' | null>(null);
+  const [sortDir, setSortDir] = React.useState<'asc' | 'desc'>('asc');
   const [visibleCount, setVisibleCount] = React.useState(PAGE_SIZE);
   const sentinelRef = React.useRef<HTMLDivElement>(null);
   const [editingJournalist, setEditingJournalist] = React.useState<JournalistRow | null>(null);
@@ -98,7 +100,7 @@ export function JournalistsTable({ journalists }: JournalistsTableProps) {
   }, [journalists]);
 
   const filtered = React.useMemo(() => {
-    return journalists.filter((j) => {
+    const list = journalists.filter((j) => {
       const matchesSearch =
         !search ||
         `${j.first_name} ${j.last_name}`.toLowerCase().includes(search.toLowerCase()) ||
@@ -114,12 +116,58 @@ export function JournalistsTable({ journalists }: JournalistsTableProps) {
 
       return matchesSearch && matchesType && matchesTags;
     });
-  }, [journalists, search, mediaTypeFilter, selectedTags]);
+
+    if (!sortCol) return list;
+
+    return [...list].sort((a, b) => {
+      let valA: string | number | null = null;
+      let valB: string | number | null = null;
+
+      if (sortCol === 'name') {
+        valA = `${a.last_name} ${a.first_name}`.toLowerCase();
+        valB = `${b.last_name} ${b.first_name}`.toLowerCase();
+      } else if (sortCol === 'media') {
+        valA = (a.media_outlet ?? '').toLowerCase();
+        valB = (b.media_outlet ?? '').toLowerCase();
+      } else if (sortCol === 'type') {
+        valA = a.media_type ?? '';
+        valB = b.media_type ?? '';
+      } else if (sortCol === 'score') {
+        valA = a.quality_score ?? -1;
+        valB = b.quality_score ?? -1;
+      } else if (sortCol === 'last_contacted') {
+        valA = a.last_contacted_at ?? '';
+        valB = b.last_contacted_at ?? '';
+      }
+
+      if (valA === null || valA === '') return 1;
+      if (valB === null || valB === '') return -1;
+      if (valA < valB) return sortDir === 'asc' ? -1 : 1;
+      if (valA > valB) return sortDir === 'asc' ? 1 : -1;
+      return 0;
+    });
+  }, [journalists, search, mediaTypeFilter, selectedTags, sortCol, sortDir]);
+
+  const handleSort = (col: typeof sortCol) => {
+    if (sortCol === col) {
+      setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSortCol(col);
+      setSortDir('asc');
+    }
+  };
+
+  const SortIcon = ({ col }: { col: typeof sortCol }) => {
+    if (sortCol !== col) return <ArrowUpDown className="h-3 w-3 ml-1 opacity-30" />;
+    return sortDir === 'asc'
+      ? <ArrowUp className="h-3 w-3 ml-1 text-hpr-gold" />
+      : <ArrowDown className="h-3 w-3 ml-1 text-hpr-gold" />;
+  };
 
   // Reset visible count when filters change
   React.useEffect(() => {
     setVisibleCount(PAGE_SIZE);
-  }, [search, mediaTypeFilter, selectedTags]);
+  }, [search, mediaTypeFilter, selectedTags, sortCol, sortDir]);
 
   // IntersectionObserver for infinite scroll
   React.useEffect(() => {
@@ -283,13 +331,33 @@ export function JournalistsTable({ journalists }: JournalistsTableProps) {
           <Table>
             <TableHeader>
               <TableRow className="hover:bg-transparent">
-                <TableHead className="w-[220px]">Nom</TableHead>
-                <TableHead>Média</TableHead>
-                <TableHead>Type</TableHead>
+                <TableHead className="w-[220px]">
+                  <button onClick={() => handleSort('name')} className="flex items-center text-xs font-medium hover:text-foreground transition-colors">
+                    Nom <SortIcon col="name" />
+                  </button>
+                </TableHead>
+                <TableHead>
+                  <button onClick={() => handleSort('media')} className="flex items-center text-xs font-medium hover:text-foreground transition-colors">
+                    Média <SortIcon col="media" />
+                  </button>
+                </TableHead>
+                <TableHead>
+                  <button onClick={() => handleSort('type')} className="flex items-center text-xs font-medium hover:text-foreground transition-colors">
+                    Type <SortIcon col="type" />
+                  </button>
+                </TableHead>
                 <TableHead>Thématiques</TableHead>
                 <TableHead>Tags</TableHead>
-                <TableHead className="text-center w-[100px]">{t('qualityScore')}</TableHead>
-                <TableHead className="w-[120px]">{t('lastContacted')}</TableHead>
+                <TableHead className="text-center w-[100px]">
+                  <button onClick={() => handleSort('score')} className="flex items-center justify-center w-full text-xs font-medium hover:text-foreground transition-colors">
+                    {t('qualityScore')} <SortIcon col="score" />
+                  </button>
+                </TableHead>
+                <TableHead className="w-[120px]">
+                  <button onClick={() => handleSort('last_contacted')} className="flex items-center text-xs font-medium hover:text-foreground transition-colors">
+                    {t('lastContacted')} <SortIcon col="last_contacted" />
+                  </button>
+                </TableHead>
                 <TableHead className="text-right w-[80px]">{tCommon('actions')}</TableHead>
               </TableRow>
             </TableHeader>
