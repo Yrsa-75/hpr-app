@@ -417,21 +417,28 @@ export function JournalistsTable({ journalists }: JournalistsTableProps) {
                   <TableCell>
                     {journalist.tags && journalist.tags.length > 0 ? (
                       <div className="flex flex-wrap gap-1">
-                        {journalist.tags.slice(0, 2).map((tag, i) => (
+                        {journalist.tags.map((tag, i) => (
                           <span
                             key={i}
-                            className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
+                            className={`inline-flex items-center rounded-full px-1.5 py-0.5 text-[10.8px] font-medium ${
                               tag === 'auto-source'
                                 ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20'
+                                : tag === 'email-verified'
+                                ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                                : tag === 'non-existent'
+                                ? 'bg-red-500/10 text-red-400 border border-red-500/20'
+                                : tag === 'unverifiable'
+                                ? 'bg-zinc-500/10 text-zinc-400 border border-zinc-500/20'
+                                : tag === 'via-hunter'
+                                ? 'bg-violet-500/10 text-violet-400 border border-violet-500/20'
+                                : tag === 'email-pattern'
+                                ? 'bg-orange-500/10 text-orange-400 border border-orange-500/20'
                                 : 'bg-hpr-gold/10 text-hpr-gold border border-hpr-gold/20'
                             }`}
                           >
                             {tag}
                           </span>
                         ))}
-                        {journalist.tags.length > 2 && (
-                          <span className="text-xs text-muted-foreground">+{journalist.tags.length - 2}</span>
-                        )}
                       </div>
                     ) : (
                       <span className="text-muted-foreground text-xs">—</span>
