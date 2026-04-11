@@ -308,12 +308,20 @@ function EmailPreview({ pressRelease, client }: { pressRelease: PressReleaseRow;
   const iframeRef = React.useRef<HTMLIFrameElement>(null);
   const html = buildEmailHtml(pressRelease, client);
 
-  // Auto-resize iframe to content height
-  function handleIframeLoad() {
+  function resizeIframe() {
     const iframe = iframeRef.current;
     if (!iframe?.contentDocument?.body) return;
     iframe.style.height = iframe.contentDocument.body.scrollHeight + 'px';
   }
+
+  // Resize whenever expanded toggles — onLoad alone ne suffit pas car l'iframe est déjà chargée
+  React.useEffect(() => {
+    if (expanded) {
+      resizeIframe();
+    } else if (iframeRef.current) {
+      iframeRef.current.style.height = '480px';
+    }
+  }, [expanded]);
 
   return (
     <div className="space-y-2">
@@ -352,18 +360,14 @@ function EmailPreview({ pressRelease, client }: { pressRelease: PressReleaseRow;
       </div>
 
       {/* Corps email en iframe */}
-      <div
-        className={`border-x border-b border-white/[0.08] rounded-b-xl overflow-hidden bg-white transition-all ${
-          expanded ? '' : 'max-h-[480px]'
-        }`}
-      >
+      <div className={`border-x border-b border-white/[0.08] rounded-b-xl overflow-hidden bg-white ${!expanded ? 'max-h-[480px]' : ''}`}>
         <iframe
           ref={iframeRef}
           srcDoc={html}
           title="Aperçu email"
           className="w-full border-0"
-          style={{ minHeight: 200, height: expanded ? undefined : 480 }}
-          onLoad={expanded ? handleIframeLoad : undefined}
+          style={{ minHeight: 200, height: 480 }}
+          onLoad={resizeIframe}
           sandbox="allow-same-origin"
         />
       </div>
