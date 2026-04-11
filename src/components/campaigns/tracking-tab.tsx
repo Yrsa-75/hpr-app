@@ -156,8 +156,8 @@ export function TrackingTab({ emailSends, campaignId }: TrackingTabProps) {
 
   const counts = {
     delivered: sent.filter((s) => ['delivered', 'opened', 'clicked'].includes(s.status)).length,
-    opened: sent.filter((s) => ['opened', 'clicked'].includes(s.status)).length,
-    clicked: sent.filter((s) => s.status === 'clicked').length,
+    opened: sent.filter((s) => s.opened_at != null || s.clicked_at != null).length,
+    clicked: sent.filter((s) => s.clicked_at != null).length,
     bounced: sent.filter((s) => s.status === 'bounced').length,
     complained: sent.filter((s) => s.status === 'complained').length,
   };
