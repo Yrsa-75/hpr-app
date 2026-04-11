@@ -77,7 +77,7 @@ export function CampaignTabs({
         <TabsTrigger value="targeting">
           {t('tabs.targeting')}
           {targetCount > 0 && (
-            <span className="ml-1.5 text-[10px] bg-hpr-gold/20 text-hpr-gold px-1.5 py-0 rounded-full">
+            <span className="ml-1.5 text-[12px] bg-hpr-gold/20 text-hpr-gold px-1.5 py-0 rounded-full">
               {targetCount}
             </span>
           )}
@@ -87,7 +87,7 @@ export function CampaignTabs({
         <TabsTrigger value="replies">
           {t('tabs.replies')}
           {threads.length > 0 && (
-            <span className="ml-1.5 text-[10px] bg-white/10 text-muted-foreground px-1.5 py-0 rounded-full">
+            <span className="ml-1.5 text-[12px] bg-white/10 text-muted-foreground px-1.5 py-0 rounded-full">
               {threads.length}
             </span>
           )}
@@ -95,7 +95,7 @@ export function CampaignTabs({
         <TabsTrigger value="clippings">
           {t('tabs.clippings')}
           {clippings.length > 0 && (
-            <span className="ml-1.5 text-[10px] bg-white/10 text-muted-foreground px-1.5 py-0 rounded-full">
+            <span className="ml-1.5 text-[12px] bg-white/10 text-muted-foreground px-1.5 py-0 rounded-full">
               {clippings.length}
             </span>
           )}

@@ -66,7 +66,7 @@ function NavLink({
       />
       <span className="flex-1">{t(item.key)}</span>
       {item.badge !== undefined && item.badge > 0 && (
-        <span className="flex h-5 w-5 items-center justify-center rounded-full bg-hpr-gold text-[10px] font-bold text-black">
+        <span className="flex h-5 w-5 items-center justify-center rounded-full bg-hpr-gold text-[12px] font-bold text-black">
           {item.badge > 99 ? '99+' : item.badge}
         </span>
       )}

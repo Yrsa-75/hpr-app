@@ -145,7 +145,7 @@ export function HprLogo({ variant = 'full', size = 'md', className }: LogoProps)
           </span>
         )}
         {size === 'lg' && (
-          <span className="text-[10px] text-muted-foreground tracking-[0.15em] uppercase mt-0.5">
+          <span className="text-[12px] text-muted-foreground tracking-[0.15em] uppercase mt-0.5">
             Hermès Press Room
           </span>
         )}

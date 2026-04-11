@@ -266,7 +266,7 @@ export function CsvImportDialog({ open, onOpenChange }: CsvImportDialogProps) {
             return (
               <React.Fragment key={s}>
                 <div className={`flex items-center gap-1.5 text-xs ${isActive ? 'text-hpr-gold' : isDone ? 'text-green-400' : 'text-muted-foreground'}`}>
-                  <span className={`flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-medium ${isActive ? 'bg-hpr-gold/20 text-hpr-gold' : isDone ? 'bg-green-500/20 text-green-400' : 'bg-white/[0.06]'}`}>
+                  <span className={`flex h-5 w-5 items-center justify-center rounded-full text-[12px] font-medium ${isActive ? 'bg-hpr-gold/20 text-hpr-gold' : isDone ? 'bg-green-500/20 text-green-400' : 'bg-white/[0.06]'}`}>
                     {isDone ? '✓' : i + 1}
                   </span>
                   {labels[s]}
@@ -443,7 +443,7 @@ export function CsvImportDialog({ open, onOpenChange }: CsvImportDialogProps) {
                   Détail des {result.errorDetails.length} erreur{result.errorDetails.length > 1 ? 's' : ''} :
                 </p>
                 <div className="rounded-lg border border-red-500/20 bg-red-500/5 overflow-hidden max-h-56 overflow-y-auto">
-                  <div className="grid grid-cols-[auto_1fr_1fr_2fr] gap-0 px-3 py-1.5 bg-red-500/10 text-[10px] font-medium text-red-400/80 sticky top-0">
+                  <div className="grid grid-cols-[auto_1fr_1fr_2fr] gap-0 px-3 py-1.5 bg-red-500/10 text-[12px] font-medium text-red-400/80 sticky top-0">
                     <span className="w-10">Ligne</span>
                     <span>Nom</span>
                     <span>Email</span>
@@ -451,10 +451,10 @@ export function CsvImportDialog({ open, onOpenChange }: CsvImportDialogProps) {
                   </div>
                   <div className="divide-y divide-red-500/10">
                     {result.errorDetails.map((err, i) => (
-                      <div key={i} className="grid grid-cols-[auto_1fr_1fr_2fr] gap-0 px-3 py-1.5 text-[11px]">
+                      <div key={i} className="grid grid-cols-[auto_1fr_1fr_2fr] gap-0 px-3 py-1.5 text-[13px]">
                         <span className="w-10 text-muted-foreground/60 font-mono">{err.row}</span>
                         <span className="text-foreground/80 truncate pr-2">{err.name}</span>
-                        <span className="text-muted-foreground/70 truncate pr-2 font-mono text-[10px]">{err.email || '—'}</span>
+                        <span className="text-muted-foreground/70 truncate pr-2 font-mono text-[12px]">{err.email || '—'}</span>
                         <span className="text-red-400/80">{err.reason}</span>
                       </div>
                     ))}

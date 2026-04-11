@@ -365,7 +365,7 @@ export function ClientFormDialog({ open, onOpenChange, client }: ClientFormDialo
           {/* Preview signature */}
           {showPreview && (
             <div className="rounded-lg border border-white/[0.08] bg-white p-4 space-y-0">
-              <p className="text-[10px] text-gray-400 mb-3 font-sans">Aperçu</p>
+              <p className="text-[12px] text-gray-400 mb-3 font-sans">Aperçu</p>
               <table cellPadding={0} cellSpacing={0} style={{ borderCollapse: 'collapse', fontFamily: 'Arial, sans-serif' }}>
                 <tbody>
                   <tr>

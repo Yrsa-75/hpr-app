@@ -256,16 +256,16 @@ export function ReportTab({ campaign, client, pressRelease, emailSends, threads,
                       <p className="text-xs font-medium text-foreground print:text-gray-900">
                         {j ? `${j.first_name} ${j.last_name}` : '—'}
                       </p>
-                      {j?.media_outlet && <p className="text-[11px] text-muted-foreground/60 print:text-gray-400">{j.media_outlet}</p>}
+                      {j?.media_outlet && <p className="text-[13px] text-muted-foreground/60 print:text-gray-400">{j.media_outlet}</p>}
                     </div>
-                    <div className="w-28 text-center text-[11px] text-muted-foreground print:text-gray-500">
+                    <div className="w-28 text-center text-[13px] text-muted-foreground print:text-gray-500">
                       {s.sent_at ? new Date(s.sent_at).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' }) : '—'}
                     </div>
-                    <div className="w-20 text-center text-[11px] text-muted-foreground print:text-gray-500">
+                    <div className="w-20 text-center text-[13px] text-muted-foreground print:text-gray-500">
                       {s.opened_at ? new Date(s.opened_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : '—'}
                     </div>
                     <div className="w-20 text-center">
-                      <span className={`text-[11px] font-medium ${cfg.color} print:text-gray-700`}>{cfg.label}</span>
+                      <span className={`text-[13px] font-medium ${cfg.color} print:text-gray-700`}>{cfg.label}</span>
                     </div>
                   </div>
                 );

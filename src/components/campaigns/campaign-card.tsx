@@ -96,17 +96,17 @@ export function CampaignCard({ campaign, clientId }: CampaignCardProps) {
           <div className="flex flex-col items-center gap-0.5 bg-white/[0.02] rounded-lg p-2 border border-white/[0.04]">
             <Mail className="h-3 w-3 text-muted-foreground" />
             <span className="text-sm font-semibold text-foreground">{campaign.total_sent}</span>
-            <span className="text-[10px] text-muted-foreground/70">Envoyés</span>
+            <span className="text-[12px] text-muted-foreground/70">Envoyés</span>
           </div>
           <div className="flex flex-col items-center gap-0.5 bg-white/[0.02] rounded-lg p-2 border border-white/[0.04]">
             <Eye className="h-3 w-3 text-muted-foreground" />
             <span className="text-sm font-semibold text-foreground">{campaign.total_opened}</span>
-            <span className="text-[10px] text-muted-foreground/70">Ouverts</span>
+            <span className="text-[12px] text-muted-foreground/70">Ouverts</span>
           </div>
           <div className="flex flex-col items-center gap-0.5 bg-white/[0.02] rounded-lg p-2 border border-white/[0.04]">
             <MessageSquare className="h-3 w-3 text-muted-foreground" />
             <span className="text-sm font-semibold text-foreground">{campaign.total_replied}</span>
-            <span className="text-[10px] text-muted-foreground/70">Réponses</span>
+            <span className="text-[12px] text-muted-foreground/70">Réponses</span>
           </div>
         </div>
 

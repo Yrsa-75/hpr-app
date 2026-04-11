@@ -467,7 +467,7 @@ export function PressReleaseEditor({ campaignId, initialPressRelease }: PressRel
                     variant="ghost"
                     onClick={() => handleApplySuggestion(suggestion, i)}
                     disabled={rewritingIndex !== null}
-                    className="h-6 text-[11px] text-hpr-gold/70 hover:text-hpr-gold hover:bg-hpr-gold/5 px-2"
+                    className="h-6 text-[13px] text-hpr-gold/70 hover:text-hpr-gold hover:bg-hpr-gold/5 px-2"
                   >
                     {rewritingIndex === i ? (
                       <Loader2 className="h-3 w-3 animate-spin mr-1" />

@@ -110,7 +110,7 @@ function ThreadListItem({
             )}
           </div>
         </div>
-        <span className="text-[11px] text-muted-foreground/50 shrink-0">
+        <span className="text-[13px] text-muted-foreground/50 shrink-0">
           {formatRelative(thread.updated_at)}
         </span>
       </div>
@@ -119,7 +119,7 @@ function ThreadListItem({
           <p className="text-xs text-muted-foreground/50 truncate">{preview}</p>
         )}
         {sentimentCfg && (
-          <span className={`inline-block text-[10px] px-1.5 py-0 rounded border ${sentimentCfg.bg} ${sentimentCfg.color}`}>
+          <span className={`inline-block text-[12px] px-1.5 py-0 rounded border ${sentimentCfg.bg} ${sentimentCfg.color}`}>
             {sentimentCfg.label}
           </span>
         )}
@@ -149,7 +149,7 @@ function MessageBubble({ message }: { message: EmailMessageRow }) {
         ) : (
           <p className="whitespace-pre-wrap">{text}</p>
         )}
-        <p className={`text-[11px] mt-1.5 ${isInbound ? 'text-muted-foreground/50' : 'text-hpr-gold/50'}`}>
+        <p className={`text-[13px] mt-1.5 ${isInbound ? 'text-muted-foreground/50' : 'text-hpr-gold/50'}`}>
           {new Date(message.created_at).toLocaleString('fr-FR', {
             day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit',
           })}
@@ -237,7 +237,7 @@ function ThreadDetail({ thread, onBack }: { thread: ThreadWithJoins; onBack: () 
               {j ? `${j.first_name} ${j.last_name}` : '—'}
             </p>
             {sentimentCfg && (
-              <span className={`text-[10px] px-1.5 py-0 rounded border ${sentimentCfg.bg} ${sentimentCfg.color}`}>
+              <span className={`text-[12px] px-1.5 py-0 rounded border ${sentimentCfg.bg} ${sentimentCfg.color}`}>
                 {sentimentCfg.label}
               </span>
             )}
@@ -352,7 +352,7 @@ function ThreadDetail({ thread, onBack }: { thread: ThreadWithJoins; onBack: () 
               <>
                 {thread.ai_response_strategy && (
                   <div className="space-y-1">
-                    <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
+                    <p className="text-[12px] font-semibold text-muted-foreground uppercase tracking-wider">
                       Stratégie
                     </p>
                     <p className="text-xs text-foreground/80 leading-relaxed">
@@ -363,7 +363,7 @@ function ThreadDetail({ thread, onBack }: { thread: ThreadWithJoins; onBack: () 
 
                 {thread.ai_suggested_response && (
                   <div className="space-y-1">
-                    <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
+                    <p className="text-[12px] font-semibold text-muted-foreground uppercase tracking-wider">
                       Réponse suggérée
                     </p>
                     <div className="border border-white/[0.08] rounded-lg p-2.5 bg-white/[0.02]">
@@ -372,7 +372,7 @@ function ThreadDetail({ thread, onBack }: { thread: ThreadWithJoins; onBack: () 
                       </p>
                       <button
                         onClick={handleUseSuggestion}
-                        className="mt-2 text-[10px] text-hpr-gold/70 hover:text-hpr-gold transition-colors"
+                        className="mt-2 text-[12px] text-hpr-gold/70 hover:text-hpr-gold transition-colors"
                       >
                         ↗ Utiliser
                       </button>
@@ -490,7 +490,7 @@ export function InboxView({ threads }: InboxViewProps) {
                     {group.clientName && (
                       <p className="text-[20px] font-bold text-foreground truncate">{group.clientName}</p>
                     )}
-                    <p className="text-[11px] font-semibold text-foreground/70 truncate">
+                    <p className="text-[13px] font-semibold text-foreground/70 truncate">
                       {group.campaignName}
                     </p>
                   </div>

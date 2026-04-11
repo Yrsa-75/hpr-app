@@ -212,7 +212,7 @@ export function TargetingTab({
                   }`}
                 >
                   {label}
-                  <span className={`text-[10px] ${active ? 'text-hpr-gold/70' : 'text-muted-foreground/50'}`}>
+                  <span className={`text-[12px] ${active ? 'text-hpr-gold/70' : 'text-muted-foreground/50'}`}>
                     {count}
                   </span>
                 </button>

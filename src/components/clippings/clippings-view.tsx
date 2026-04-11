@@ -69,15 +69,15 @@ export function ClippingCard({ clipping }: { clipping: ClippingWithJoins }) {
           {/* Header */}
           <div className="flex items-center gap-2 flex-wrap">
             {!clipping.is_verified && (
-              <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-400 border border-amber-500/20">
+              <span className="text-[12px] font-semibold px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-400 border border-amber-500/20">
                 À valider
               </span>
             )}
             {clipping.detection_method === 'google_news' && (
-              <span className="text-[10px] text-muted-foreground/60">Google News</span>
+              <span className="text-[12px] text-muted-foreground/60">Google News</span>
             )}
             {sentimentCfg && (
-              <span className={`text-[10px] px-1.5 py-0 rounded border ${sentimentCfg.bg} ${sentimentCfg.color}`}>
+              <span className={`text-[12px] px-1.5 py-0 rounded border ${sentimentCfg.bg} ${sentimentCfg.color}`}>
                 {sentimentCfg.label}
               </span>
             )}

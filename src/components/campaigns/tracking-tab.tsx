@@ -295,12 +295,12 @@ export function TrackingTab({ emailSends, campaignId }: TrackingTabProps) {
                       {j ? `${j.first_name} ${j.last_name}` : '—'}
                     </p>
                     {j?.media_outlet && (
-                      <p className="text-[11px] text-muted-foreground/70 truncate">{j.media_outlet}</p>
+                      <p className="text-[13px] text-muted-foreground/70 truncate">{j.media_outlet}</p>
                     )}
                   </div>
                   <div className="w-24 text-center">
                     {s.sent_at ? (
-                      <span className="text-[11px] text-muted-foreground">
+                      <span className="text-[13px] text-muted-foreground">
                         {new Date(s.sent_at).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' })}
                         {' '}
                         {new Date(s.sent_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
@@ -312,17 +312,17 @@ export function TrackingTab({ emailSends, campaignId }: TrackingTabProps) {
                       const dt = s.opened_at ?? (s.status === 'clicked' ? s.clicked_at : null);
                       const isFallback = !s.opened_at && !!s.clicked_at;
                       if (!dt) return (
-                        <span className="text-[11px] text-muted-foreground/40 flex items-center justify-center gap-1">
+                        <span className="text-[13px] text-muted-foreground/40 flex items-center justify-center gap-1">
                           <Clock className="h-3 w-3" />—
                         </span>
                       );
                       return (
-                        <span className={`text-[11px] flex flex-col items-center gap-0 ${isFallback ? 'text-hpr-gold/70' : 'text-emerald-400'}`}>
+                        <span className={`text-[13px] flex flex-col items-center gap-0 ${isFallback ? 'text-hpr-gold/70' : 'text-emerald-400'}`}>
                           <span className="flex items-center gap-1">
                             <Eye className="h-3 w-3" />
                             {new Date(dt).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' })}
                           </span>
-                          <span className="text-[10px] opacity-80">
+                          <span className="text-[12px] opacity-80">
                             {new Date(dt).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
                             {isFallback && <span className="ml-0.5 opacity-60">(clic)</span>}
                           </span>
@@ -331,9 +331,9 @@ export function TrackingTab({ emailSends, campaignId }: TrackingTabProps) {
                     })()}
                   </div>
                   <div className="w-20 text-center">
-                    <span className={`text-[11px] font-medium ${cfg.color}`}>{cfg.label}</span>
+                    <span className={`text-[13px] font-medium ${cfg.color}`}>{cfg.label}</span>
                     {s.status === 'bounced' && (s as { bounce_reason?: string | null }).bounce_reason && (
-                      <p className="text-[10px] text-red-400/60 mt-0.5 leading-tight">
+                      <p className="text-[12px] text-red-400/60 mt-0.5 leading-tight">
                         {(s as { bounce_reason?: string | null }).bounce_reason}
                       </p>
                     )}
