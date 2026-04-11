@@ -5,7 +5,6 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { ProfileTab } from '@/components/settings/profile-tab';
 import { OrganisationTab } from '@/components/settings/organisation-tab';
 import { SendersTab } from '@/components/settings/senders-tab';
-import { IntegrationsTab } from '@/components/settings/integrations-tab';
 import { NotificationsTab } from '@/components/settings/notifications-tab';
 
 export const metadata: Metadata = { title: 'Paramètres — HPR' };
@@ -53,9 +52,6 @@ export default async function SettingsPage({
     (profile?.preferences as Record<string, unknown>)?.notifications as Record<string, boolean>
   ) ?? {};
 
-  const slackWebhookUrl =
-    ((organisation?.settings as Record<string, unknown>)?.slack_webhook_url as string) ?? null;
-
   return (
     <div className="space-y-6">
       <div>
@@ -70,7 +66,6 @@ export default async function SettingsPage({
           <TabsTrigger value="profile">Profil</TabsTrigger>
           <TabsTrigger value="organisation">Organisation</TabsTrigger>
           <TabsTrigger value="senders">Expéditeurs email</TabsTrigger>
-          <TabsTrigger value="integrations">Intégrations</TabsTrigger>
           <TabsTrigger value="notifications">Notifications</TabsTrigger>
         </TabsList>
 
@@ -90,10 +85,6 @@ export default async function SettingsPage({
 
         <TabsContent value="senders" className="mt-6">
           <SendersTab clients={clients ?? []} locale={locale} />
-        </TabsContent>
-
-        <TabsContent value="integrations" className="mt-6">
-          <IntegrationsTab slackWebhookUrl={slackWebhookUrl} />
         </TabsContent>
 
         <TabsContent value="notifications" className="mt-6">

@@ -123,65 +123,6 @@ export async function uploadOrgLogoAction(formData: FormData) {
   return { success: true, url: publicUrl };
 }
 
-// ─── Intégrations ───────────────────────────────────────────────────────────
-
-export async function updateSlackWebhookAction(webhookUrl: string) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return { error: 'Non authentifié' };
-
-  const { data: profile } = await supabase
-    .from('users')
-    .select('organization_id')
-    .eq('id', user.id)
-    .single();
-  if (!profile?.organization_id) return { error: 'Organisation introuvable' };
-
-  const { data: org } = await supabase
-    .from('organizations')
-    .select('settings')
-    .eq('id', profile.organization_id)
-    .single();
-
-  const currentSettings = (org?.settings as Record<string, unknown>) ?? {};
-  const newSettings = { ...currentSettings, slack_webhook_url: webhookUrl || null };
-
-  const { error } = await supabase
-    .from('organizations')
-    .update({ settings: newSettings })
-    .eq('id', profile.organization_id);
-
-  if (error) return { error: error.message };
-  return { success: true };
-}
-
-export async function testResendConnectionAction() {
-  try {
-    const { Resend } = await import('resend');
-    const resend = new Resend(process.env.RESEND_API_KEY);
-    const { data, error } = await resend.domains.list();
-    if (error) return { ok: false, message: error.message };
-    return { ok: true, message: `${(data as { data?: unknown[] })?.data?.length ?? 0} domaine(s) configuré(s)` };
-  } catch {
-    return { ok: false, message: 'Clé API invalide ou absente' };
-  }
-}
-
-export async function testAnthropicConnectionAction() {
-  try {
-    const Anthropic = (await import('@anthropic-ai/sdk')).default;
-    const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-    await client.messages.create({
-      model: 'claude-haiku-4-5-20251001',
-      max_tokens: 5,
-      messages: [{ role: 'user', content: 'ping' }],
-    });
-    return { ok: true, message: 'Connexion active' };
-  } catch {
-    return { ok: false, message: 'Clé API invalide ou absente' };
-  }
-}
-
 // ─── Notifications preferences ──────────────────────────────────────────────
 
 export async function updateNotificationPreferencesAction(
