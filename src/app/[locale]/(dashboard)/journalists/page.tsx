@@ -39,7 +39,8 @@ export default async function JournalistsPage() {
       const { data } = await supabase
         .from('journalists')
         .select('*')
-        .eq('organization_id', organizationId)
+        .or(`organization_id.eq.${organizationId},is_global.eq.true`)
+        .order('is_global', { ascending: true }) // journalistes perso en premier
         .order('created_at', { ascending: false });
 
       journalists = data ?? [];

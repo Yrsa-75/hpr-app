@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import { useTranslations } from 'next-intl';
-import { Search, Pencil, Trash2, Loader2 } from 'lucide-react';
+import { Search, Pencil, Trash2, Loader2, Tag, X } from 'lucide-react';
 
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -22,6 +22,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover';
 import { useToast } from '@/components/ui/use-toast';
 import { JournalistFormDialog } from '@/components/journalists/journalist-form-dialog';
 import { deleteJournalistAction } from '@/app/[locale]/(dashboard)/journalists/actions';
@@ -71,11 +76,26 @@ export function JournalistsTable({ journalists }: JournalistsTableProps) {
 
   const [search, setSearch] = React.useState('');
   const [mediaTypeFilter, setMediaTypeFilter] = React.useState('all');
+  const [selectedTags, setSelectedTags] = React.useState<string[]>([]);
+  const [tagPopoverOpen, setTagPopoverOpen] = React.useState(false);
   const [visibleCount, setVisibleCount] = React.useState(PAGE_SIZE);
   const sentinelRef = React.useRef<HTMLDivElement>(null);
   const [editingJournalist, setEditingJournalist] = React.useState<JournalistRow | null>(null);
   const [dialogOpen, setDialogOpen] = React.useState(false);
   const [deletingId, setDeletingId] = React.useState<string | null>(null);
+
+  // Derive unique tags from all journalists
+  const allTags = React.useMemo(() => {
+    const tagSet = new Set<string>();
+    for (const j of journalists) {
+      if (j.tags) {
+        for (const tag of j.tags) {
+          if (tag.trim()) tagSet.add(tag.trim());
+        }
+      }
+    }
+    return Array.from(tagSet).sort((a, b) => a.localeCompare(b, 'fr'));
+  }, [journalists]);
 
   const filtered = React.useMemo(() => {
     return journalists.filter((j) => {
@@ -88,14 +108,18 @@ export function JournalistsTable({ journalists }: JournalistsTableProps) {
       const matchesType =
         mediaTypeFilter === 'all' || j.media_type === mediaTypeFilter;
 
-      return matchesSearch && matchesType;
+      const matchesTags =
+        selectedTags.length === 0 ||
+        selectedTags.every((tag) => j.tags?.includes(tag));
+
+      return matchesSearch && matchesType && matchesTags;
     });
-  }, [journalists, search, mediaTypeFilter]);
+  }, [journalists, search, mediaTypeFilter, selectedTags]);
 
   // Reset visible count when filters change
   React.useEffect(() => {
     setVisibleCount(PAGE_SIZE);
-  }, [search, mediaTypeFilter]);
+  }, [search, mediaTypeFilter, selectedTags]);
 
   // IntersectionObserver for infinite scroll
   React.useEffect(() => {
@@ -143,7 +167,7 @@ export function JournalistsTable({ journalists }: JournalistsTableProps) {
   return (
     <>
       {/* Filters */}
-      <div className="flex items-center gap-3">
+      <div className="flex flex-wrap items-center gap-3">
         <div className="relative flex-1 max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
@@ -166,7 +190,79 @@ export function JournalistsTable({ journalists }: JournalistsTableProps) {
             ))}
           </SelectContent>
         </Select>
-        {(search || mediaTypeFilter !== 'all') && (
+
+        {/* Tag filter */}
+        {allTags.length > 0 && (
+          <Popover open={tagPopoverOpen} onOpenChange={setTagPopoverOpen}>
+            <PopoverTrigger asChild>
+              <Button
+                variant="outline"
+                size="sm"
+                className={`h-9 gap-1.5 bg-white/[0.03] border-white/[0.08] hover:bg-white/[0.06] ${selectedTags.length > 0 ? 'border-hpr-gold/40 text-hpr-gold' : 'text-muted-foreground'}`}
+              >
+                <Tag className="h-3.5 w-3.5" />
+                Tags
+                {selectedTags.length > 0 && (
+                  <span className="ml-0.5 rounded-full bg-hpr-gold/20 px-1.5 py-0.5 text-xs font-medium text-hpr-gold">
+                    {selectedTags.length}
+                  </span>
+                )}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-56 p-2" align="start">
+              <p className="px-2 py-1 text-xs font-medium text-muted-foreground mb-1">Filtrer par tag</p>
+              <div className="space-y-0.5 max-h-60 overflow-y-auto">
+                {allTags.map((tag) => {
+                  const isSelected = selectedTags.includes(tag);
+                  return (
+                    <button
+                      key={tag}
+                      onClick={() =>
+                        setSelectedTags((prev) =>
+                          isSelected ? prev.filter((t) => t !== tag) : [...prev, tag]
+                        )
+                      }
+                      className={`w-full flex items-center justify-between rounded px-2 py-1.5 text-sm transition-colors ${
+                        isSelected
+                          ? 'bg-hpr-gold/10 text-hpr-gold'
+                          : 'text-foreground/80 hover:bg-white/[0.05]'
+                      }`}
+                    >
+                      <span className="truncate">{tag}</span>
+                      {isSelected && <X className="h-3 w-3 shrink-0 ml-1" />}
+                    </button>
+                  );
+                })}
+              </div>
+              {selectedTags.length > 0 && (
+                <button
+                  onClick={() => setSelectedTags([])}
+                  className="mt-2 w-full rounded px-2 py-1.5 text-xs text-muted-foreground hover:text-foreground hover:bg-white/[0.05] transition-colors text-left"
+                >
+                  Effacer les filtres
+                </button>
+              )}
+            </PopoverContent>
+          </Popover>
+        )}
+
+        {/* Active tag chips */}
+        {selectedTags.map((tag) => (
+          <span
+            key={tag}
+            className="inline-flex items-center gap-1 rounded-full bg-hpr-gold/10 px-2.5 py-0.5 text-xs text-hpr-gold border border-hpr-gold/20"
+          >
+            {tag}
+            <button
+              onClick={() => setSelectedTags((prev) => prev.filter((t) => t !== tag))}
+              className="hover:text-hpr-gold/60"
+            >
+              <X className="h-3 w-3" />
+            </button>
+          </span>
+        ))}
+
+        {(search || mediaTypeFilter !== 'all' || selectedTags.length > 0) && (
           <span className="text-xs text-muted-foreground">
             {filtered.length} résultat{filtered.length !== 1 ? 's' : ''}
           </span>
@@ -191,6 +287,7 @@ export function JournalistsTable({ journalists }: JournalistsTableProps) {
                 <TableHead>Média</TableHead>
                 <TableHead>Type</TableHead>
                 <TableHead>Thématiques</TableHead>
+                <TableHead>Tags</TableHead>
                 <TableHead className="text-center w-[100px]">{t('qualityScore')}</TableHead>
                 <TableHead className="w-[120px]">{t('lastContacted')}</TableHead>
                 <TableHead className="text-right w-[80px]">{tCommon('actions')}</TableHead>
@@ -243,6 +340,29 @@ export function JournalistsTable({ journalists }: JournalistsTableProps) {
                         ))}
                         {journalist.beat.length > 2 && (
                           <span className="text-xs text-muted-foreground">+{journalist.beat.length - 2}</span>
+                        )}
+                      </div>
+                    ) : (
+                      <span className="text-muted-foreground text-xs">—</span>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    {journalist.tags && journalist.tags.length > 0 ? (
+                      <div className="flex flex-wrap gap-1">
+                        {journalist.tags.slice(0, 2).map((tag, i) => (
+                          <span
+                            key={i}
+                            className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
+                              tag === 'auto-source'
+                                ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20'
+                                : 'bg-hpr-gold/10 text-hpr-gold border border-hpr-gold/20'
+                            }`}
+                          >
+                            {tag}
+                          </span>
+                        ))}
+                        {journalist.tags.length > 2 && (
+                          <span className="text-xs text-muted-foreground">+{journalist.tags.length - 2}</span>
                         )}
                       </div>
                     ) : (
