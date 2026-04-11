@@ -13,6 +13,7 @@ import {
   MailOpen,
   Send,
 } from 'lucide-react';
+import { PeriodSelector } from '@/components/dashboard/period-selector';
 
 export async function generateMetadata(): Promise<Metadata> {
   const t = await getTranslations('dashboard');
@@ -56,16 +57,33 @@ function formatRelative(dateStr: string): string {
   return new Date(dateStr).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' });
 }
 
-export default async function DashboardPage() {
+const PERIOD_LABELS: Record<string, string> = {
+  '24h': '24 dernières heures',
+  '7d': '7 derniers jours',
+  '30d': '30 derniers jours',
+  'all': 'Depuis le début',
+};
+
+function getPeriodStart(period: string): string | null {
+  if (period === 'all') return null;
+  const ms = period === '24h' ? 24 * 3600 * 1000 : period === '7d' ? 7 * 24 * 3600 * 1000 : 30 * 24 * 3600 * 1000;
+  return new Date(Date.now() - ms).toISOString();
+}
+
+export default async function DashboardPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ period?: string }>;
+}) {
   const t = await getTranslations('dashboard');
   const supabase = await createClient();
-
-  const weekAgo = new Date(Date.now() - 7 * 24 * 3600 * 1000).toISOString();
-  const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString();
+  const { period: rawPeriod } = await searchParams;
+  const period = ['24h', '7d', '30d', 'all'].includes(rawPeriod ?? '') ? (rawPeriod ?? '7d') : '7d';
+  const periodStart = getPeriodStart(period);
 
   const [
     { count: activeCampaigns },
-    { count: emailsThisWeek },
+    { count: emailsInPeriod },
     { count: totalJournalists },
     { count: totalClients },
     { count: totalCampaigns },
@@ -75,13 +93,17 @@ export default async function DashboardPage() {
     { data: recentSends },
   ] = await Promise.all([
     supabase.from('campaigns').select('*', { count: 'exact', head: true }).in('status', ['active', 'sending']),
-    supabase.from('email_sends').select('*', { count: 'exact', head: true }).gte('sent_at', weekAgo),
+    periodStart
+      ? supabase.from('email_sends').select('*', { count: 'exact', head: true }).gte('sent_at', periodStart)
+      : supabase.from('email_sends').select('*', { count: 'exact', head: true }),
     supabase.from('journalists').select('*', { count: 'exact', head: true }).eq('is_opted_out', false),
     supabase.from('clients').select('*', { count: 'exact', head: true }),
     supabase.from('campaigns').select('*', { count: 'exact', head: true }),
     supabase.from('email_threads').select('*', { count: 'exact', head: true }).in('status', ['new', 'needs_response']),
-    // Open rate: fetch status counts
-    supabase.from('email_sends').select('status').gte('sent_at', monthStart),
+    // Open rate for selected period
+    periodStart
+      ? supabase.from('email_sends').select('status').gte('sent_at', periodStart)
+      : supabase.from('email_sends').select('status'),
     // Recent journalist replies
     supabase
       .from('email_threads')
@@ -98,17 +120,20 @@ export default async function DashboardPage() {
       .limit(4),
   ]);
 
-  // Calculate open rate from this month's sends
   const totalSent = sendStats?.length ?? 0;
   const totalOpened = sendStats?.filter((s) => ['opened', 'clicked'].includes(s.status)).length ?? 0;
   const openRate = totalSent > 0 ? Math.round((totalOpened / totalSent) * 100) : null;
+  const periodLabel = PERIOD_LABELS[period];
 
   return (
     <div className="space-y-8 animate-fade-in">
       {/* Page header */}
-      <div>
-        <h1 className="font-display text-2xl font-bold text-foreground">{t('title')}</h1>
-        <p className="text-sm text-muted-foreground mt-1">{t('subtitle')}</p>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="font-display text-2xl font-bold text-foreground">{t('title')}</h1>
+          <p className="text-sm text-muted-foreground mt-1">{t('subtitle')}</p>
+        </div>
+        <PeriodSelector current={period} />
       </div>
 
       {/* KPI Cards */}
@@ -121,16 +146,16 @@ export default async function DashboardPage() {
           accentColor="text-hpr-gold"
         />
         <KPICard
-          title="Emails envoyés (7j)"
-          value={emailsThisWeek ?? 0}
-          subtitle="Cette semaine"
+          title="Emails envoyés"
+          value={emailsInPeriod ?? 0}
+          subtitle={periodLabel}
           icon={Mail}
           accentColor="text-blue-400"
         />
         <KPICard
           title="Taux d'ouverture"
           value={openRate !== null ? `${openRate}%` : '—'}
-          subtitle="Ce mois-ci"
+          subtitle={periodLabel}
           icon={TrendingUp}
           accentColor="text-emerald-400"
         />
