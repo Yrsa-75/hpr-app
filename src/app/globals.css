@@ -95,6 +95,25 @@
   }
 }
 
+/* Print styles — clean PDF export for reports */
+@media print {
+  /* Hide everything except the main content */
+  aside, nav, header, [data-sidebar], [data-sidebar-wrapper],
+  .print\:hidden { display: none !important; }
+
+  /* Make main area full width */
+  body { background: white !important; color: black !important; }
+  main, [data-main-content] { margin: 0 !important; padding: 16px !important; max-width: 100% !important; }
+
+  /* Force light colors */
+  * { color-scheme: light !important; }
+  .dark * { --background: 0 0% 100%; --foreground: 0 0% 0%; }
+
+  /* Page breaks */
+  .print\:break-before { break-before: page; }
+  h3 { break-after: avoid; }
+}
+
 /* Custom scrollbar */
 ::-webkit-scrollbar {
   width: 6px;

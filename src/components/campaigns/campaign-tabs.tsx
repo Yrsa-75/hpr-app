@@ -10,7 +10,8 @@ import { SendingTab, type EmailSendWithJoins } from '@/components/campaigns/send
 import { TrackingTab } from '@/components/campaigns/tracking-tab';
 import { RepliesTab, type ThreadWithJoins } from '@/components/campaigns/replies-tab';
 import { ClippingsTab } from '@/components/campaigns/clippings-tab';
-import type { PressReleaseRow, JournalistRow } from '@/types/database';
+import { ReportTab } from '@/components/campaigns/report-tab';
+import type { PressReleaseRow, JournalistRow, CampaignRow } from '@/types/database';
 import type { ClippingWithJoins } from '@/app/[locale]/(dashboard)/clippings/page';
 
 interface ClientInfo {
@@ -22,6 +23,7 @@ interface ClientInfo {
 }
 
 interface CampaignTabsProps {
+  campaign: CampaignRow;
   campaignId: string;
   clientId: string;
   pressRelease: PressReleaseRow | null;
@@ -50,6 +52,7 @@ function ComingSoonTab({ label }: { label: string }) {
 }
 
 export function CampaignTabs({
+  campaign,
   campaignId,
   clientId,
   pressRelease,
@@ -139,7 +142,14 @@ export function CampaignTabs({
       </TabsContent>
 
       <TabsContent value="report">
-        <ComingSoonTab label={t('tabs.report')} />
+        <ReportTab
+          campaign={campaign}
+          client={client}
+          pressRelease={pressRelease}
+          emailSends={emailSends}
+          threads={threads}
+          clippings={clippings}
+        />
       </TabsContent>
     </Tabs>
   );

@@ -217,6 +217,7 @@ export default async function CampaignDetailPage({
 
       {/* Tabs */}
       <CampaignTabs
+        campaign={campaign as CampaignRow}
         campaignId={campaignId}
         clientId={clientId}
         pressRelease={pressRelease as PressReleaseRow | null}

@@ -3,6 +3,73 @@
 import { revalidatePath } from 'next/cache';
 import { createClient } from '@/lib/supabase/server';
 
+export type ReportSummaryResult = {
+  success: boolean;
+  error?: string;
+  summary?: string;
+};
+
+export async function generateReportSummaryAction(campaignId: string): Promise<ReportSummaryResult> {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { success: false, error: 'Unauthorized' };
+
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) return { success: false, error: 'Clé API Anthropic non configurée' };
+
+  const [{ data: campaign }, { data: sends }, { data: clippings }, { data: threads }] = await Promise.all([
+    supabase.from('campaigns').select('name, total_sent, clients(name)').eq('id', campaignId).single(),
+    supabase.from('email_sends').select('status').eq('campaign_id', campaignId).neq('status', 'queued'),
+    supabase.from('press_clippings').select('title, source_name, sentiment, is_verified').eq('campaign_id', campaignId),
+    supabase.from('email_threads').select('status, sentiment').eq('campaign_id', campaignId),
+  ]);
+
+  if (!campaign) return { success: false, error: 'Campagne introuvable' };
+
+  const total = sends?.length ?? 0;
+  const opened = sends?.filter(s => ['opened', 'clicked'].includes(s.status)).length ?? 0;
+  const clicked = sends?.filter(s => s.status === 'clicked').length ?? 0;
+  const bounced = sends?.filter(s => s.status === 'bounced').length ?? 0;
+  const replied = threads?.length ?? 0;
+  const retombees = clippings?.filter(c => c.is_verified).length ?? 0;
+  const client = (campaign as any).clients?.name ?? 'le client';
+
+  const clippingsList = clippings?.filter(c => c.is_verified).map(c => `- ${c.title} (${c.source_name})`).join('\n') ?? '';
+
+  try {
+    const { default: Anthropic } = await import('@anthropic-ai/sdk');
+    const anthropic = new Anthropic({ apiKey });
+
+    const message = await anthropic.messages.create({
+      model: 'claude-haiku-4-5-20251001',
+      max_tokens: 600,
+      messages: [{
+        role: 'user',
+        content: `Tu es un expert en relations presse. Rédige un résumé exécutif concis (3-4 paragraphes) pour ce rapport de campagne RP.
+
+**Campagne :** ${campaign.name}
+**Client :** ${client}
+
+**Statistiques :**
+- Emails envoyés : ${total}
+- Taux d'ouverture : ${total > 0 ? Math.round(opened / total * 100) : 0}% (${opened} ouverts)
+- Taux de clic : ${total > 0 ? Math.round(clicked / total * 100) : 0}% (${clicked} cliqués)
+- Bounces : ${bounced}
+- Réponses reçues : ${replied}
+- Retombées presse validées : ${retombees}
+${clippingsList ? `\n**Articles publiés :**\n${clippingsList}` : ''}
+
+Rédige en français, ton professionnel et factuel. Commence par les points forts, puis les axes d'amélioration. Sois direct et concis.`,
+      }],
+    });
+
+    const summary = message.content[0].type === 'text' ? message.content[0].text : '';
+    return { success: true, summary };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : 'Erreur inconnue' };
+  }
+}
+
 export async function updateCampaignAction(
   campaignId: string,
   data: {
