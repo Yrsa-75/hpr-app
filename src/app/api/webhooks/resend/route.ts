@@ -7,6 +7,11 @@ interface ResendWebhookEvent {
   data: {
     email_id: string;
     created_at: string;
+    // bounce fields
+    bounce?: {
+      type?: string; // 'hard' | 'soft'
+      message?: string;
+    };
   };
 }
 
@@ -74,11 +79,17 @@ async function handleEvent(body: ResendWebhookEvent) {
     case 'email.clicked':
       updates.status = 'clicked';
       updates.clicked_at = now;
+      updates.opened_at = now; // set opened_at if not already set (pixel may have been blocked)
       break;
-    case 'email.bounced':
+    case 'email.bounced': {
       updates.status = 'bounced';
       updates.bounced_at = now;
+      const bounceType = body.data?.bounce?.type;
+      const bounceMsg = body.data?.bounce?.message;
+      const parts = [bounceType, bounceMsg].filter(Boolean);
+      if (parts.length) updates.bounce_reason = parts.join(' — ');
       break;
+    }
     case 'email.complained':
       updates.status = 'complained';
       break;
@@ -86,10 +97,14 @@ async function handleEvent(body: ResendWebhookEvent) {
       return NextResponse.json({ ok: true });
   }
 
-  await supabase
-    .from('email_sends')
-    .update(updates)
-    .eq('resend_email_id', emailId);
+  // For clicked events, only set opened_at if not already set
+  if (body.type === 'email.clicked' && updates.opened_at) {
+    const { opened_at, ...otherUpdates } = updates;
+    await supabase.from('email_sends').update(otherUpdates).eq('resend_email_id', emailId);
+    await supabase.from('email_sends').update({ opened_at }).eq('resend_email_id', emailId).is('opened_at', null);
+  } else {
+    await supabase.from('email_sends').update(updates).eq('resend_email_id', emailId);
+  }
 
   return NextResponse.json({ ok: true });
 }

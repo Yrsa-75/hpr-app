@@ -318,6 +318,11 @@ export function TrackingTab({ emailSends, campaignId }: TrackingTabProps) {
                   </div>
                   <div className="w-20 text-center">
                     <span className={`text-[11px] font-medium ${cfg.color}`}>{cfg.label}</span>
+                    {s.status === 'bounced' && (s as { bounce_reason?: string | null }).bounce_reason && (
+                      <p className="text-[10px] text-red-400/60 mt-0.5 leading-tight">
+                        {(s as { bounce_reason?: string | null }).bounce_reason}
+                      </p>
+                    )}
                   </div>
                 </div>
               );

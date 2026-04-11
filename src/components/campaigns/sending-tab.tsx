@@ -19,6 +19,7 @@ interface ClientInfo {
 export interface EmailSendWithJoins extends EmailSendRow {
   journalists?: { first_name: string; last_name: string; email: string; media_outlet: string | null } | null;
   press_releases?: { title: string } | null;
+  bounce_reason?: string | null;
 }
 
 interface SendingTabProps {
