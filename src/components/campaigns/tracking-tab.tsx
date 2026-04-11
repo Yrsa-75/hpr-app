@@ -96,7 +96,10 @@ export function TrackingTab({ emailSends, campaignId }: TrackingTabProps) {
       let valA: string | null = null;
       let valB: string | null = null;
       if (sortCol === 'sent_at') { valA = a.sent_at; valB = b.sent_at; }
-      else if (sortCol === 'opened_at') { valA = a.opened_at; valB = b.opened_at; }
+      else if (sortCol === 'opened_at') {
+        valA = a.opened_at ?? (a.status === 'clicked' ? a.clicked_at : null);
+        valB = b.opened_at ?? (b.status === 'clicked' ? b.clicked_at : null);
+      }
       else if (sortCol === 'status') { valA = a.status; valB = b.status; }
 
       if (!valA && !valB) return 0;
@@ -234,13 +237,14 @@ export function TrackingTab({ emailSends, campaignId }: TrackingTabProps) {
             <span>Journaliste</span>
             {(['sent_at', 'opened_at', 'status'] as const).map((col) => {
               const labels = { sent_at: 'Envoyé le', opened_at: 'Ouverture', status: 'Statut' };
+              const widths = { sent_at: 'w-24', opened_at: 'w-32', status: 'w-20' };
               const active = sortCol === col;
               const Icon = active ? (sortDir === 'asc' ? ChevronUp : ChevronDown) : ChevronsUpDown;
               return (
                 <button
                   key={col}
                   onClick={() => handleSort(col)}
-                  className={`w-24 flex items-center justify-center gap-1 hover:text-foreground transition-colors ${active ? 'text-foreground' : ''}`}
+                  className={`${widths[col]} flex items-center justify-center gap-1 hover:text-foreground transition-colors ${active ? 'text-foreground' : ''}`}
                 >
                   {labels[col]}
                   <Icon className="h-3 w-3 flex-shrink-0" />
@@ -303,18 +307,28 @@ export function TrackingTab({ emailSends, campaignId }: TrackingTabProps) {
                       </span>
                     ) : <span className="text-muted-foreground/40">—</span>}
                   </div>
-                  <div className="w-20 text-center">
-                    {s.opened_at ? (
-                      <span className="text-[11px] text-emerald-400 flex items-center justify-center gap-1">
-                        <Eye className="h-3 w-3" />
-                        {new Date(s.opened_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
-                      </span>
-                    ) : (
-                      <span className="text-[11px] text-muted-foreground/40 flex items-center justify-center gap-1">
-                        <Clock className="h-3 w-3" />
-                        —
-                      </span>
-                    )}
+                  <div className="w-32 text-center">
+                    {(() => {
+                      const dt = s.opened_at ?? (s.status === 'clicked' ? s.clicked_at : null);
+                      const isFallback = !s.opened_at && !!s.clicked_at;
+                      if (!dt) return (
+                        <span className="text-[11px] text-muted-foreground/40 flex items-center justify-center gap-1">
+                          <Clock className="h-3 w-3" />—
+                        </span>
+                      );
+                      return (
+                        <span className={`text-[11px] flex flex-col items-center gap-0 ${isFallback ? 'text-hpr-gold/70' : 'text-emerald-400'}`}>
+                          <span className="flex items-center gap-1">
+                            <Eye className="h-3 w-3" />
+                            {new Date(dt).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' })}
+                          </span>
+                          <span className="text-[10px] opacity-80">
+                            {new Date(dt).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
+                            {isFallback && <span className="ml-0.5 opacity-60">(clic)</span>}
+                          </span>
+                        </span>
+                      );
+                    })()}
                   </div>
                   <div className="w-20 text-center">
                     <span className={`text-[11px] font-medium ${cfg.color}`}>{cfg.label}</span>
