@@ -12,9 +12,10 @@ interface ClientDetailActionsProps {
   clientId: string;
   clientName?: string;
   showNewCampaign: boolean;
+  className?: string;
 }
 
-export function ClientDetailActions({ client, clientId, clientName, showNewCampaign }: ClientDetailActionsProps) {
+export function ClientDetailActions({ client, clientId, clientName, showNewCampaign, className }: ClientDetailActionsProps) {
   const [editOpen, setEditOpen] = React.useState(false);
   const [newCampaignOpen, setNewCampaignOpen] = React.useState(false);
 
@@ -46,7 +47,7 @@ export function ClientDetailActions({ client, clientId, clientName, showNewCampa
         variant="outline"
         size="sm"
         onClick={() => setEditOpen(true)}
-        className="border-white/[0.08] hover:border-white/20 text-muted-foreground hover:text-foreground"
+        className={`border-white/[0.08] hover:border-white/20 text-muted-foreground hover:text-foreground${className ? ` ${className}` : ''}`}
       >
         <Pencil className="mr-2 h-3.5 w-3.5" />
         Modifier

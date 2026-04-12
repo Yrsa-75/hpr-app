@@ -4,6 +4,11 @@ import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { createClient, createServiceClient } from '@/lib/supabase/server';
 
+const socialLinkSchema = z.object({
+  network: z.string().min(1),
+  url: z.string().url(),
+});
+
 const clientSchema = z.object({
   name: z.string().min(1).max(100),
   industry: z.string().optional(),
@@ -20,6 +25,7 @@ const clientSchema = z.object({
     .transform((val) => (val === '' ? undefined : val))
     .pipe(z.string().email().optional()),
   signature_text: z.string().optional(),
+  social_links: z.array(socialLinkSchema).optional(),
 });
 
 export type ClientFormState = {
@@ -78,8 +84,36 @@ async function uploadSignatureLogo(file: File, clientId: string): Promise<string
   return publicUrl;
 }
 
-function buildSignatureHtml(logoUrl: string | null, signatureText: string | null): string | null {
-  if (!logoUrl && !signatureText) return null;
+import { makeSocialIconDataUri } from '@/lib/social-icons';
+
+type SocialLink = { network: string; url: string };
+
+function buildSocialLinksHtml(socialLinks: SocialLink[]): string {
+  if (!socialLinks.length) return '';
+  const icons = socialLinks
+    .map((l) => {
+      const uri = makeSocialIconDataUri(l.network);
+      if (!uri) return '';
+      const label = l.network;
+      return `<a href="${l.url}" style="display:inline-block;margin-right:8px;text-decoration:none;" target="_blank" rel="noopener"><img src="${uri}" width="28" height="28" alt="${label}" style="display:block;border-radius:4px;" /></a>`;
+    })
+    .filter(Boolean)
+    .join('');
+  if (!icons) return '';
+  return `<div style="margin-bottom:16px;font-family:Arial,sans-serif;">
+  <div style="font-size:11px;font-weight:700;color:#555;margin-bottom:8px;text-transform:uppercase;letter-spacing:0.08em;">Suivez nous !</div>
+  <div>${icons}</div>
+</div>`;
+}
+
+function buildSignatureHtml(
+  logoUrl: string | null,
+  signatureText: string | null,
+  socialLinks?: SocialLink[]
+): string | null {
+  const socialHtml = socialLinks?.length ? buildSocialLinksHtml(socialLinks) : '';
+
+  if (!logoUrl && !signatureText && !socialHtml) return null;
 
   const lines = (signatureText ?? '')
     .split('\n')
@@ -94,8 +128,10 @@ function buildSignatureHtml(logoUrl: string | null, signatureText: string | null
     )
     .join('');
 
+  let sigHtml: string;
+
   if (logoUrl && lines.length > 0) {
-    return `<table cellpadding="0" cellspacing="0" border="0" style="font-family:Arial,sans-serif;">
+    sigHtml = `<table cellpadding="0" cellspacing="0" border="0" style="font-family:Arial,sans-serif;">
   <tr>
     <td style="padding-right:14px;vertical-align:middle;">
       <img src="${logoUrl}" alt="Logo" style="max-width:150px;width:auto;height:auto;display:block;" />
@@ -105,13 +141,15 @@ function buildSignatureHtml(logoUrl: string | null, signatureText: string | null
     </td>
   </tr>
 </table>`;
+  } else if (logoUrl) {
+    sigHtml = `<img src="${logoUrl}" alt="Logo" style="max-width:150px;width:auto;height:auto;display:block;" />`;
+  } else if (lines.length > 0) {
+    sigHtml = `<div style="font-family:Arial,sans-serif;">${textHtml}</div>`;
+  } else {
+    sigHtml = '';
   }
 
-  if (logoUrl) {
-    return `<img src="${logoUrl}" alt="Logo" style="max-width:150px;width:auto;height:auto;display:block;" />`;
-  }
-
-  return `<div style="font-family:Arial,sans-serif;">${textHtml}</div>`;
+  return `${socialHtml}${sigHtml}` || null;
 }
 
 export async function createClientAction(
@@ -124,6 +162,12 @@ export async function createClientAction(
     return { success: false, error: 'Unauthorized' };
   }
 
+  const socialLinksRaw = formData.get('social_links') as string | null;
+  let socialLinksParsed: SocialLink[] = [];
+  try {
+    if (socialLinksRaw) socialLinksParsed = JSON.parse(socialLinksRaw) as SocialLink[];
+  } catch { /* ignore */ }
+
   const raw = {
     name: formData.get('name') as string,
     industry: (formData.get('industry') as string) || undefined,
@@ -132,6 +176,7 @@ export async function createClientAction(
     sender_name: (formData.get('sender_name') as string) || undefined,
     sender_email: (formData.get('sender_email') as string) || undefined,
     signature_text: (formData.get('signature_text') as string) || undefined,
+    social_links: socialLinksParsed,
   };
 
   const parsed = clientSchema.safeParse(raw);
@@ -155,6 +200,7 @@ export async function createClientAction(
       sender_name: parsed.data.sender_name ?? null,
       sender_email: parsed.data.sender_email ?? null,
       signature_text: parsed.data.signature_text ?? null,
+      social_links: parsed.data.social_links ?? [],
     })
     .select('id')
     .single();
@@ -172,7 +218,7 @@ export async function createClientAction(
   }
 
   // Generate and save signature HTML
-  const signatureHtml = buildSignatureHtml(signatureLogoUrl, parsed.data.signature_text ?? null);
+  const signatureHtml = buildSignatureHtml(signatureLogoUrl, parsed.data.signature_text ?? null, parsed.data.social_links);
 
   if (signatureLogoUrl || signatureHtml) {
     await supabase
@@ -200,6 +246,12 @@ export async function updateClientAction(
     return { success: false, error: 'Unauthorized' };
   }
 
+  const socialLinksRaw = formData.get('social_links') as string | null;
+  let socialLinksParsed: SocialLink[] = [];
+  try {
+    if (socialLinksRaw) socialLinksParsed = JSON.parse(socialLinksRaw) as SocialLink[];
+  } catch { /* ignore */ }
+
   const raw = {
     name: formData.get('name') as string,
     industry: (formData.get('industry') as string) || undefined,
@@ -208,6 +260,7 @@ export async function updateClientAction(
     sender_name: (formData.get('sender_name') as string) || undefined,
     sender_email: (formData.get('sender_email') as string) || undefined,
     signature_text: (formData.get('signature_text') as string) || undefined,
+    social_links: socialLinksParsed,
   };
 
   const parsed = clientSchema.safeParse(raw);
@@ -238,7 +291,7 @@ export async function updateClientAction(
     signatureLogoUrl = await uploadSignatureLogo(logoFile, id);
   }
 
-  const signatureHtml = buildSignatureHtml(signatureLogoUrl, parsed.data.signature_text ?? null);
+  const signatureHtml = buildSignatureHtml(signatureLogoUrl, parsed.data.signature_text ?? null, parsed.data.social_links);
 
   const { error } = await supabase
     .from('clients')
@@ -250,6 +303,7 @@ export async function updateClientAction(
       sender_name: parsed.data.sender_name ?? null,
       sender_email: parsed.data.sender_email ?? null,
       signature_text: parsed.data.signature_text ?? null,
+      social_links: parsed.data.social_links ?? [],
       logo_url: signatureLogoUrl,
       signature_logo_url: signatureLogoUrl,
       email_signature_html: signatureHtml,

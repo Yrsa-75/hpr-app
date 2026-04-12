@@ -5,7 +5,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useTranslations } from 'next-intl';
-import { Loader2, Upload, X } from 'lucide-react';
+import { Loader2, Upload, X, Plus, Trash2 } from 'lucide-react';
 
 import {
   Dialog,
@@ -14,6 +14,13 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -21,7 +28,10 @@ import { Textarea } from '@/components/ui/textarea';
 import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/components/ui/use-toast';
 import { createClientAction, updateClientAction } from '@/app/[locale]/(dashboard)/clients/actions';
+import { SOCIAL_NETWORKS, makeSocialIconDataUri, SOCIAL_NETWORK_LABELS } from '@/lib/social-icons';
 import type { ClientRow } from '@/types/database';
+
+type SocialLink = { network: string; url: string };
 
 const clientFormSchema = z.object({
   name: z.string().min(1, 'Ce champ est obligatoire').max(100),
@@ -64,6 +74,8 @@ export function ClientFormDialog({ open, onOpenChange, client }: ClientFormDialo
   const [logoFile, setLogoFile] = React.useState<File | null>(null);
   const [logoPreview, setLogoPreview] = React.useState<string | null>(null);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
+  // Social links
+  const [socialLinks, setSocialLinks] = React.useState<SocialLink[]>([]);
 
   const isEditing = Boolean(client);
 
@@ -101,6 +113,7 @@ export function ClientFormDialog({ open, onOpenChange, client }: ClientFormDialo
       });
       setLogoFile(null);
       setLogoPreview(client?.signature_logo_url ?? null);
+      setSocialLinks(Array.isArray(client?.social_links) ? (client.social_links as SocialLink[]) : []);
     }
   }, [open, client, reset]);
 
@@ -136,6 +149,8 @@ export function ClientFormDialog({ open, onOpenChange, client }: ClientFormDialo
         formData.set('keep_existing_logo', 'true');
       }
 
+      formData.set('social_links', JSON.stringify(socialLinks));
+
       const result = isEditing && client
         ? await updateClientAction(client.id, formData)
         : await createClientAction(formData);
@@ -164,7 +179,7 @@ export function ClientFormDialog({ open, onOpenChange, client }: ClientFormDialo
     .map((l) => l.trim())
     .filter(Boolean);
 
-  const showPreview = logoPreview || signatureLines.length > 0;
+  const showPreview = logoPreview || signatureLines.length > 0 || socialLinks.length > 0;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -280,6 +295,69 @@ export function ClientFormDialog({ open, onOpenChange, client }: ClientFormDialo
             )}
           </div>
 
+          {/* Social links separator */}
+          <div className="flex items-center gap-3 pt-1">
+            <Separator className="flex-1 bg-white/[0.06]" />
+            <span className="text-xs text-muted-foreground whitespace-nowrap">
+              Réseaux sociaux
+            </span>
+            <Separator className="flex-1 bg-white/[0.06]" />
+          </div>
+
+          {/* Social links */}
+          <div className="space-y-2">
+            {socialLinks.map((link, index) => (
+              <div key={index} className="flex items-center gap-2">
+                <Select
+                  value={link.network}
+                  onValueChange={(value) => {
+                    const updated = [...socialLinks];
+                    updated[index] = { ...updated[index], network: value };
+                    setSocialLinks(updated);
+                  }}
+                >
+                  <SelectTrigger className="w-[148px] shrink-0 bg-white/[0.03] border-white/[0.08] focus:border-hpr-gold/50 text-sm">
+                    <SelectValue placeholder="Réseau" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {SOCIAL_NETWORKS.map((n) => (
+                      <SelectItem key={n.id} value={n.id}>{n.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Input
+                  value={link.url}
+                  onChange={(e) => {
+                    const updated = [...socialLinks];
+                    updated[index] = { ...updated[index], url: e.target.value };
+                    setSocialLinks(updated);
+                  }}
+                  placeholder="https://..."
+                  className="flex-1 bg-white/[0.03] border-white/[0.08] focus:border-hpr-gold/50 text-sm"
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setSocialLinks(socialLinks.filter((_, i) => i !== index))}
+                  className="h-9 w-9 p-0 text-muted-foreground hover:text-red-400 shrink-0"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </div>
+            ))}
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => setSocialLinks([...socialLinks, { network: 'linkedin', url: '' }])}
+              className="h-8 text-xs text-muted-foreground hover:text-foreground px-2 gap-1.5"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              Ajouter un réseau social
+            </Button>
+          </div>
+
           {/* Signature separator */}
           <div className="flex items-center gap-3 pt-1">
             <Separator className="flex-1 bg-white/[0.06]" />
@@ -366,6 +444,32 @@ export function ClientFormDialog({ open, onOpenChange, client }: ClientFormDialo
           {showPreview && (
             <div className="rounded-lg border border-white/[0.08] bg-white p-4 space-y-0">
               <p className="text-[12px] text-gray-400 mb-3 font-sans">Aperçu</p>
+              {/* Social links preview */}
+              {socialLinks.length > 0 && (
+                <div style={{ marginBottom: 16, fontFamily: 'Arial, sans-serif' }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: '#555', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+                    Suivez nous !
+                  </div>
+                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                    {socialLinks.map((l, i) => {
+                      const uri = makeSocialIconDataUri(l.network);
+                      return uri ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          key={i}
+                          src={uri}
+                          width={28}
+                          height={28}
+                          alt={SOCIAL_NETWORK_LABELS[l.network] ?? l.network}
+                          title={SOCIAL_NETWORK_LABELS[l.network] ?? l.network}
+                          style={{ borderRadius: 4, display: 'block' }}
+                        />
+                      ) : null;
+                    })}
+                  </div>
+                </div>
+              )}
+              {/* Signature preview */}
               <table cellPadding={0} cellSpacing={0} style={{ borderCollapse: 'collapse', fontFamily: 'Arial, sans-serif' }}>
                 <tbody>
                   <tr>

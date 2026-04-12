@@ -92,57 +92,57 @@ export default async function ClientDetailPage({
       </Link>
 
       {/* Client header */}
-      <div className="flex items-start justify-between">
-        <div className="flex items-start gap-4">
-          {client.logo_url ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={client.logo_url}
-              alt={client.name}
-              className="h-14 w-14 rounded-xl object-cover flex-shrink-0"
-            />
-          ) : (
-            <div
-              className={`h-14 w-14 rounded-xl flex items-center justify-center flex-shrink-0 ${avatarColor}`}
-            >
-              <span className="text-lg font-semibold text-white/90">{initials}</span>
-            </div>
-          )}
-          <div className="space-y-1">
+      <div className="flex items-start gap-4">
+        {client.logo_url ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={client.logo_url}
+            alt={client.name}
+            className="h-14 w-14 rounded-xl object-cover flex-shrink-0"
+          />
+        ) : (
+          <div
+            className={`h-14 w-14 rounded-xl flex items-center justify-center flex-shrink-0 ${avatarColor}`}
+          >
+            <span className="text-lg font-semibold text-white/90">{initials}</span>
+          </div>
+        )}
+        <div className="space-y-1">
+          <div className="flex items-center">
             <h1 className="font-display text-2xl font-bold text-foreground">{client.name}</h1>
-            <div className="flex items-center gap-3">
-              {client.industry && (
-                <span className="inline-block bg-white/5 text-muted-foreground text-xs px-2.5 py-1 rounded-full border border-white/[0.06]">
-                  {client.industry}
-                </span>
-              )}
-              {client.website && (
-                <a
-                  href={client.website}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-1 text-xs text-muted-foreground hover:text-hpr-gold transition-colors"
-                >
-                  <ExternalLink className="h-3 w-3" />
-                  <span>{client.website.replace(/^https?:\/\//, '')}</span>
-                </a>
-              )}
-            </div>
-            {client.description && (
-              <p className="text-sm text-muted-foreground max-w-xl leading-relaxed">
-                {client.description}
-              </p>
+            {/* Edit client button (client-side component) */}
+            <ClientDetailActions
+              client={client as ClientRow}
+              clientId={clientId}
+              clientName={client.name}
+              showNewCampaign={false}
+              className="ml-[50px]"
+            />
+          </div>
+          <div className="flex items-center gap-3">
+            {client.industry && (
+              <span className="inline-block bg-white/5 text-muted-foreground text-xs px-2.5 py-1 rounded-full border border-white/[0.06]">
+                {client.industry}
+              </span>
+            )}
+            {client.website && (
+              <a
+                href={client.website}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-1 text-xs text-muted-foreground hover:text-hpr-gold transition-colors"
+              >
+                <ExternalLink className="h-3 w-3" />
+                <span>{client.website.replace(/^https?:\/\//, '')}</span>
+              </a>
             )}
           </div>
+          {client.description && (
+            <p className="text-sm text-muted-foreground max-w-xl leading-relaxed">
+              {client.description}
+            </p>
+          )}
         </div>
-
-        {/* Edit client button (client-side component) */}
-        <ClientDetailActions
-          client={client as ClientRow}
-          clientId={clientId}
-          clientName={client.name}
-          showNewCampaign={false}
-        />
       </div>
 
       {/* Tabs: Campagnes / Pack Média */}
