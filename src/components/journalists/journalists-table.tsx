@@ -86,9 +86,10 @@ export function JournalistsTable({ journalists }: JournalistsTableProps) {
   const [dialogOpen, setDialogOpen] = React.useState(false);
   const [deletingId, setDeletingId] = React.useState<string | null>(null);
 
-  // Derive unique tags from all journalists
+  // Derive unique tags from all journalists — always include system tags
+  const SYSTEM_TAGS = ['validate'];
   const allTags = React.useMemo(() => {
-    const tagSet = new Set<string>();
+    const tagSet = new Set<string>(SYSTEM_TAGS);
     for (const j of journalists) {
       if (j.tags) {
         for (const tag of j.tags) {
