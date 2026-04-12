@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import { useTranslations } from 'next-intl';
-import { Search, Pencil, Trash2, Loader2, Tag, X, ArrowUpDown, ArrowUp, ArrowDown, CheckCircle2 } from 'lucide-react';
+import { Search, Pencil, Trash2, Loader2, Tag, Layers, X, ArrowUpDown, ArrowUp, ArrowDown, CheckCircle2 } from 'lucide-react';
 
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -78,6 +78,8 @@ export function JournalistsTable({ journalists }: JournalistsTableProps) {
   const [mediaTypeFilter, setMediaTypeFilter] = React.useState('all');
   const [selectedTags, setSelectedTags] = React.useState<string[]>([]);
   const [tagPopoverOpen, setTagPopoverOpen] = React.useState(false);
+  const [selectedBeats, setSelectedBeats] = React.useState<string[]>([]);
+  const [beatPopoverOpen, setBeatPopoverOpen] = React.useState(false);
   const [sortCol, setSortCol] = React.useState<'name' | 'media' | 'type' | 'score' | 'last_contacted' | null>(null);
   const [sortDir, setSortDir] = React.useState<'asc' | 'desc'>('asc');
   const [visibleCount, setVisibleCount] = React.useState(PAGE_SIZE);
@@ -88,6 +90,19 @@ export function JournalistsTable({ journalists }: JournalistsTableProps) {
   const [selectedIds, setSelectedIds] = React.useState<Set<string>>(new Set());
   const [isBulkLoading, setIsBulkLoading] = React.useState(false);
   const selectAllRef = React.useRef<HTMLInputElement>(null);
+
+  // Derive unique beats from all journalists
+  const allBeats = React.useMemo(() => {
+    const beatSet = new Set<string>();
+    for (const j of journalists) {
+      if (j.beat) {
+        for (const b of j.beat) {
+          if (b.trim()) beatSet.add(b.trim());
+        }
+      }
+    }
+    return Array.from(beatSet).sort((a, b) => a.localeCompare(b, 'fr'));
+  }, [journalists]);
 
   // Derive unique tags from all journalists — always include system tags
   const SYSTEM_TAGS = ['validate'];
@@ -118,7 +133,11 @@ export function JournalistsTable({ journalists }: JournalistsTableProps) {
         selectedTags.length === 0 ||
         selectedTags.every((tag) => j.tags?.includes(tag));
 
-      return matchesSearch && matchesType && matchesTags;
+      const matchesBeats =
+        selectedBeats.length === 0 ||
+        selectedBeats.every((beat) => j.beat?.includes(beat));
+
+      return matchesSearch && matchesType && matchesTags && matchesBeats;
     });
 
     const sorted = sortCol
@@ -158,7 +177,7 @@ export function JournalistsTable({ journalists }: JournalistsTableProps) {
       if (aHas === bHas) return 0;
       return aHas ? -1 : 1;
     });
-  }, [journalists, search, mediaTypeFilter, selectedTags, sortCol, sortDir]);
+  }, [journalists, search, mediaTypeFilter, selectedTags, selectedBeats, sortCol, sortDir]);
 
   const handleSort = (col: typeof sortCol) => {
     if (sortCol === col) {
@@ -179,7 +198,7 @@ export function JournalistsTable({ journalists }: JournalistsTableProps) {
   // Reset visible count when filters change
   React.useEffect(() => {
     setVisibleCount(PAGE_SIZE);
-  }, [search, mediaTypeFilter, selectedTags, sortCol, sortDir]);
+  }, [search, mediaTypeFilter, selectedTags, selectedBeats, sortCol, sortDir]);
 
   // IntersectionObserver for infinite scroll
   React.useEffect(() => {
@@ -358,6 +377,61 @@ export function JournalistsTable({ journalists }: JournalistsTableProps) {
           </Popover>
         )}
 
+        {/* Beat filter */}
+        {allBeats.length > 0 && (
+          <Popover open={beatPopoverOpen} onOpenChange={setBeatPopoverOpen}>
+            <PopoverTrigger asChild>
+              <Button
+                variant="outline"
+                size="sm"
+                className={`h-9 gap-1.5 bg-white/[0.03] border-white/[0.08] hover:bg-white/[0.06] ${selectedBeats.length > 0 ? 'border-hpr-gold/40 text-hpr-gold' : 'text-muted-foreground'}`}
+              >
+                <Layers className="h-3.5 w-3.5" />
+                Thématiques
+                {selectedBeats.length > 0 && (
+                  <span className="ml-0.5 rounded-full bg-hpr-gold/20 px-1.5 py-0.5 text-xs font-medium text-hpr-gold">
+                    {selectedBeats.length}
+                  </span>
+                )}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-56 p-2" align="start">
+              <p className="px-2 py-1 text-xs font-medium text-muted-foreground mb-1">Filtrer par thématique</p>
+              <div className="space-y-0.5 max-h-60 overflow-y-auto">
+                {allBeats.map((beat) => {
+                  const isSelected = selectedBeats.includes(beat);
+                  return (
+                    <button
+                      key={beat}
+                      onClick={() =>
+                        setSelectedBeats((prev) =>
+                          isSelected ? prev.filter((b) => b !== beat) : [...prev, beat]
+                        )
+                      }
+                      className={`w-full flex items-center justify-between rounded px-2 py-1.5 text-sm transition-colors ${
+                        isSelected
+                          ? 'bg-hpr-gold/10 text-hpr-gold'
+                          : 'text-foreground/80 hover:bg-white/[0.05]'
+                      }`}
+                    >
+                      <span className="truncate">{beat}</span>
+                      {isSelected && <X className="h-3 w-3 shrink-0 ml-1" />}
+                    </button>
+                  );
+                })}
+              </div>
+              {selectedBeats.length > 0 && (
+                <button
+                  onClick={() => setSelectedBeats([])}
+                  className="mt-2 w-full rounded px-2 py-1.5 text-xs text-muted-foreground hover:text-foreground hover:bg-white/[0.05] transition-colors text-left"
+                >
+                  Effacer les filtres
+                </button>
+              )}
+            </PopoverContent>
+          </Popover>
+        )}
+
         {/* Active tag chips */}
         {selectedTags.map((tag) => (
           <span
@@ -374,7 +448,23 @@ export function JournalistsTable({ journalists }: JournalistsTableProps) {
           </span>
         ))}
 
-        {(search || mediaTypeFilter !== 'all' || selectedTags.length > 0) && (
+        {/* Active beat chips */}
+        {selectedBeats.map((beat) => (
+          <span
+            key={beat}
+            className="inline-flex items-center gap-1 rounded-full bg-hpr-gold/10 px-2.5 py-0.5 text-xs text-hpr-gold border border-hpr-gold/20"
+          >
+            {beat}
+            <button
+              onClick={() => setSelectedBeats((prev) => prev.filter((b) => b !== beat))}
+              className="hover:text-hpr-gold/60"
+            >
+              <X className="h-3 w-3" />
+            </button>
+          </span>
+        ))}
+
+        {(search || mediaTypeFilter !== 'all' || selectedTags.length > 0 || selectedBeats.length > 0) && (
           <span className="text-xs text-muted-foreground">
             {filtered.length} résultat{filtered.length !== 1 ? 's' : ''}
           </span>
