@@ -106,5 +106,38 @@ async function handleEvent(body: ResendWebhookEvent) {
     await supabase.from('email_sends').update(updates).eq('resend_email_id', emailId);
   }
 
+  // Sur un bounce : vider l'email du journaliste pour que Hunter retente
+  if (body.type === 'email.bounced') {
+    const { data: send } = await supabase
+      .from('email_sends')
+      .select('journalist_id')
+      .eq('resend_email_id', emailId)
+      .single();
+
+    if (send?.journalist_id) {
+      const { data: journalist } = await supabase
+        .from('journalists')
+        .select('tags')
+        .eq('id', send.journalist_id)
+        .single();
+
+      if (journalist) {
+        const currentTags: string[] = journalist.tags ?? [];
+        const newTags = [
+          ...currentTags.filter((t) => t !== 'validate' && t !== 'email-bounced' && t !== 'hunter-tried'),
+          'email-bounced',
+        ];
+        await supabase
+          .from('journalists')
+          .update({
+            email: null,
+            tags: newTags,
+            updated_at: now,
+          })
+          .eq('id', send.journalist_id);
+      }
+    }
+  }
+
   return NextResponse.json({ ok: true });
 }
