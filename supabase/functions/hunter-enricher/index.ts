@@ -228,13 +228,15 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 // ============================================
 // Main
 // ============================================
+const CRON_SECRET = 'hpr-cron-runner-xK9mP2026';
+
 Deno.serve(async (req) => {
   if (req.method !== 'POST') {
     return new Response('Method not allowed', { status: 405 });
   }
 
   const auth = req.headers.get('Authorization');
-  if (auth !== `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`) {
+  if (auth !== `Bearer ${SUPABASE_SERVICE_ROLE_KEY}` && auth !== `Bearer ${CRON_SECRET}`) {
     return new Response('Unauthorized', { status: 401 });
   }
 

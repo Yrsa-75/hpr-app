@@ -234,13 +234,15 @@ Réponds UNIQUEMENT avec un tableau JSON valide (pas de markdown, pas de comment
 // ============================================
 // Main
 // ============================================
+const CRON_SECRET = 'hpr-cron-runner-xK9mP2026';
+
 Deno.serve(async (req) => {
   if (req.method !== 'POST') {
     return new Response('Method not allowed', { status: 405 });
   }
 
   const auth = req.headers.get('Authorization');
-  if (auth !== `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`) {
+  if (auth !== `Bearer ${SUPABASE_SERVICE_ROLE_KEY}` && auth !== `Bearer ${CRON_SECRET}`) {
     return new Response('Unauthorized', { status: 401 });
   }
 
