@@ -5,7 +5,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useTranslations } from 'next-intl';
-import { Loader2 } from 'lucide-react';
+import { Loader2, CheckCircle2 } from 'lucide-react';
 
 import {
   Dialog,
@@ -87,6 +87,7 @@ export function JournalistFormDialog({
   const tCommon = useTranslations('common');
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = React.useState(false);
+  const [emailVerified, setEmailVerified] = React.useState(false);
 
   const isEditing = Boolean(journalist);
 
@@ -133,8 +134,9 @@ export function JournalistFormDialog({
         linkedin_url: journalist?.linkedin_url ?? '',
         twitter_handle: journalist?.twitter_handle ?? '',
         notes: journalist?.notes ?? '',
-        tags: journalist?.tags?.join(', ') ?? '',
+        tags: (journalist?.tags ?? []).filter((t) => t !== 'validate').join(', '),
       });
+      setEmailVerified(journalist?.tags?.includes('validate') ?? false);
     }
   }, [open, journalist, reset]);
 
@@ -142,7 +144,15 @@ export function JournalistFormDialog({
     setIsSubmitting(true);
     try {
       const formData = new FormData();
-      Object.entries(values).forEach(([key, value]) => {
+      // Merge emailVerified toggle into tags before submitting
+      const existingTags = (values.tags ?? '')
+        .split(',')
+        .map((t) => t.trim())
+        .filter((t) => t && t !== 'validate');
+      if (emailVerified) existingTags.unshift('validate');
+      const mergedValues = { ...values, tags: existingTags.join(', ') };
+
+      Object.entries(mergedValues).forEach(([key, value]) => {
         // 'none' is the UI placeholder for optional selects — skip it
         if (value !== undefined && value !== null && value !== 'none') {
           formData.set(key, String(value));
@@ -233,6 +243,18 @@ export function JournalistFormDialog({
               {errors.email && (
                 <p className="text-xs text-red-400">{errors.email.message}</p>
               )}
+              <button
+                type="button"
+                onClick={() => setEmailVerified((v) => !v)}
+                className={`mt-1 inline-flex items-center gap-1.5 text-xs font-medium transition-colors ${
+                  emailVerified
+                    ? 'text-hpr-gold'
+                    : 'text-muted-foreground hover:text-foreground/70'
+                }`}
+              >
+                <CheckCircle2 className={`h-3.5 w-3.5 ${emailVerified ? 'fill-hpr-gold/20' : ''}`} />
+                {emailVerified ? 'Email vérifié' : 'Marquer comme vérifié'}
+              </button>
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="phone" className="text-sm text-foreground/80">

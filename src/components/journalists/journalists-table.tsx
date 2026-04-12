@@ -373,14 +373,16 @@ export function JournalistsTable({ journalists }: JournalistsTableProps) {
                       <div className="min-w-0">
                         <p className="text-sm font-medium text-foreground truncate">
                           {journalist.first_name} {journalist.last_name}
-                          {journalist.is_verified && (
-                            <span className="ml-1 text-hpr-gold" title="Vérifié">✓</span>
-                          )}
                           {journalist.is_opted_out && (
                             <span className="ml-1 text-red-400 text-xs" title="Désinscrit">STOP</span>
                           )}
                         </p>
-                        <p className="text-xs text-muted-foreground truncate">{journalist.email}</p>
+                        <p className="text-xs text-muted-foreground truncate flex items-center gap-1">
+                          {journalist.email}
+                          {journalist.tags?.includes('validate') && (
+                            <span className="text-hpr-gold leading-none" title="Email vérifié">✓</span>
+                          )}
+                        </p>
                       </div>
                     </div>
                   </TableCell>
@@ -421,7 +423,9 @@ export function JournalistsTable({ journalists }: JournalistsTableProps) {
                           <span
                             key={i}
                             className={`inline-flex items-center rounded-full px-1.5 py-0.5 text-[10.8px] font-medium ${
-                              tag === 'auto-source'
+                              tag === 'validate'
+                                ? 'bg-hpr-gold/10 text-hpr-gold border border-hpr-gold/30'
+                                : tag === 'auto-source'
                                 ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20'
                                 : tag === 'email-verified'
                                 ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
