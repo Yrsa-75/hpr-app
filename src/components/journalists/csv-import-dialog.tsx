@@ -42,6 +42,7 @@ const HPR_FIELDS = [
   { key: 'twitter_handle', label: 'Twitter/X', required: false },
   { key: 'notes', label: 'Notes', required: false },
   { key: 'tags', label: 'Tags', required: false },
+  { key: 'validate', label: 'Email vérifié (✓)', required: false },
 ] as const;
 
 type HprFieldKey = typeof HPR_FIELDS[number]['key'];
@@ -110,6 +111,12 @@ function autoMap(csvColumns: string[]): Record<string, HprFieldKey | '__ignore__
     tags: 'tags',
     tag: 'tags',
     categorie: 'tags',
+    validate: 'validate',
+    verifie: 'validate',
+    verified: 'validate',
+    emailverifie: 'validate',
+    emailverified: 'validate',
+    verifiemail: 'validate',
   };
 
   for (const col of csvColumns) {
@@ -310,6 +317,9 @@ export function CsvImportDialog({ open, onOpenChange }: CsvImportDialogProps) {
             </p>
             <p className="mt-1 text-xs text-muted-foreground/60">
               Pour les thématiques et tags multi-valeurs, séparez avec <code className="font-mono bg-white/[0.06] px-1 rounded">/</code> (ex : <code className="font-mono bg-white/[0.06] px-1 rounded">web/tv</code>)
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground/60">
+              Colonne <code className="font-mono bg-white/[0.06] px-1 rounded">validate</code> : toute valeur non vide (ex : <code className="font-mono bg-white/[0.06] px-1 rounded">x</code>, <code className="font-mono bg-white/[0.06] px-1 rounded">oui</code>) marquera l'email comme vérifié ✓
             </p>
           </div>
         )}

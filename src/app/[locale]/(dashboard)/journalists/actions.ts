@@ -53,6 +53,8 @@ export type JournalistImport = {
   twitter_handle?: string;
   notes?: string;
   tags?: string;
+  /** Non-empty value means the email is verified → adds 'validate' tag */
+  validate?: string;
 };
 
 export type ImportError = {
@@ -376,7 +378,13 @@ export async function importJournalistsAction(
       linkedin_url: journalist.linkedin_url?.trim() || null,
       twitter_handle: journalist.twitter_handle?.trim() || null,
       notes: journalist.notes?.trim() || null,
-      tags: parseImportSeparated(journalist.tags),
+      tags: (() => {
+        const base = parseImportSeparated(journalist.tags) ?? [];
+        if (journalist.validate?.trim() && !base.includes('validate')) {
+          return ['validate', ...base];
+        }
+        return base.length ? base : null;
+      })(),
     });
 
     if (error) {
