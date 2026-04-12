@@ -162,6 +162,19 @@ export async function processInboundEmails(): Promise<void> {
         created_at: emailMeta.created_at,
       });
 
+      // Mise à jour du quality_score après chaque réponse reçue
+      if (!auto) {
+        const { data: newScore } = await supabase.rpc('calculate_journalist_quality_score', {
+          p_journalist_id: journalist.id,
+        });
+        if (newScore !== null) {
+          await supabase
+            .from('journalists')
+            .update({ quality_score: newScore, updated_at: new Date().toISOString() })
+            .eq('id', journalist.id);
+        }
+      }
+
       // AI analysis (skip auto-replies)
       if (!auto && bodyPlain.trim()) {
         const analysis = await analyzeJournalistReply(

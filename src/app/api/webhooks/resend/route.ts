@@ -106,6 +106,27 @@ async function handleEvent(body: ResendWebhookEvent) {
     await supabase.from('email_sends').update(updates).eq('resend_email_id', emailId);
   }
 
+  // Sur open/click : mettre à jour le quality_score du journaliste
+  if (body.type === 'email.opened' || body.type === 'email.clicked') {
+    const { data: send } = await supabase
+      .from('email_sends')
+      .select('journalist_id')
+      .eq('resend_email_id', emailId)
+      .single();
+
+    if (send?.journalist_id) {
+      const { data: newScore } = await supabase.rpc('calculate_journalist_quality_score', {
+        p_journalist_id: send.journalist_id,
+      });
+      if (newScore !== null) {
+        await supabase
+          .from('journalists')
+          .update({ quality_score: newScore, updated_at: now })
+          .eq('id', send.journalist_id);
+      }
+    }
+  }
+
   // Sur un bounce : vider l'email du journaliste pour que Hunter retente
   if (body.type === 'email.bounced') {
     const { data: send } = await supabase
