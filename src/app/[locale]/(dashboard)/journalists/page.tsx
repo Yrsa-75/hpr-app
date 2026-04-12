@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import { getTranslations } from 'next-intl/server';
 import { UserSearch } from 'lucide-react';
 
-import { createClient } from '@/lib/supabase/server';
+import { createClient, createServiceClient } from '@/lib/supabase/server';
 import { JournalistsHeader } from '@/components/journalists/journalists-header';
 import { JournalistsTable } from '@/components/journalists/journalists-table';
 import type { JournalistRow } from '@/types/database';
@@ -36,7 +36,9 @@ export default async function JournalistsPage() {
     organizationId = profile?.organization_id ?? null;
 
     if (organizationId) {
-      const { data } = await supabase
+      // Service client pour contourner la limite max-rows de PostgREST (1000)
+      const serviceClient = createServiceClient();
+      const { data } = await serviceClient
         .from('journalists')
         .select('*')
         .or(`organization_id.eq.${organizationId},is_global.eq.true`)
