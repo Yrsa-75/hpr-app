@@ -60,8 +60,9 @@ export default async function JournalistsPage() {
       {totalCount > 0 && (
         <div className="grid grid-cols-3 gap-3">
           <div className="rounded-lg border border-white/[0.06] bg-white/[0.02] px-4 py-3">
-            <p className="text-2xl font-bold text-foreground">{totalCount}</p>
-            <p className="text-xs text-muted-foreground mt-0.5">{tCommon('total')} journalistes</p>
+            <p className="text-xs text-muted-foreground/60">{totalCount} journalistes</p>
+            <p className="text-2xl font-bold text-hpr-gold mt-0.5">{verifiedCount}</p>
+            <p className="text-xs text-muted-foreground mt-0.5">contacts validés ✓</p>
           </div>
           <div className="rounded-lg border border-white/[0.06] bg-white/[0.02] px-4 py-3">
             <p className="text-2xl font-bold text-green-400">{verifiedCount}</p>
