@@ -326,12 +326,13 @@ Deno.serve(async (req) => {
         );
 
         const newTags = [
-          ...currentTags.filter((t) => t !== 'hunter-tried' && t !== 'via-hunter'),
+          ...currentTags.filter((t) => t !== 'hunter-tried' && t !== 'via-hunter' && t !== 'validate'),
           'hunter-tried',
         ];
 
         if (result.email && result.confidence >= MIN_CONFIDENCE) {
           newTags.push('via-hunter');
+          newTags.push('validate');
           stats.found++;
           stats.creditsUsed++;
 

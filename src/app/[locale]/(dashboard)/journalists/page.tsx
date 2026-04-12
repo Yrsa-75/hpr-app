@@ -48,7 +48,13 @@ export default async function JournalistsPage() {
   }
 
   const totalCount = journalists.length;
-  const verifiedCount = journalists.filter((j) => j.tags?.includes('validate')).length;
+  const verifiedCount = journalists.filter(
+    (j) => j.email && (
+      j.tags?.includes('validate') ||
+      j.tags?.includes('via-hunter') ||
+      j.tags?.includes('email-verified')
+    )
+  ).length;
   const optedOutCount = journalists.filter((j) => j.is_opted_out).length;
 
   return (
