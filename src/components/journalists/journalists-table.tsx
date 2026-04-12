@@ -121,34 +121,42 @@ export function JournalistsTable({ journalists }: JournalistsTableProps) {
       return matchesSearch && matchesType && matchesTags;
     });
 
-    if (!sortCol) return list;
+    const sorted = sortCol
+      ? [...list].sort((a, b) => {
+          let valA: string | number | null = null;
+          let valB: string | number | null = null;
 
-    return [...list].sort((a, b) => {
-      let valA: string | number | null = null;
-      let valB: string | number | null = null;
+          if (sortCol === 'name') {
+            valA = `${a.last_name} ${a.first_name}`.toLowerCase();
+            valB = `${b.last_name} ${b.first_name}`.toLowerCase();
+          } else if (sortCol === 'media') {
+            valA = (a.media_outlet ?? '').toLowerCase();
+            valB = (b.media_outlet ?? '').toLowerCase();
+          } else if (sortCol === 'type') {
+            valA = a.media_type ?? '';
+            valB = b.media_type ?? '';
+          } else if (sortCol === 'score') {
+            valA = a.quality_score ?? -1;
+            valB = b.quality_score ?? -1;
+          } else if (sortCol === 'last_contacted') {
+            valA = a.last_contacted_at ?? '';
+            valB = b.last_contacted_at ?? '';
+          }
 
-      if (sortCol === 'name') {
-        valA = `${a.last_name} ${a.first_name}`.toLowerCase();
-        valB = `${b.last_name} ${b.first_name}`.toLowerCase();
-      } else if (sortCol === 'media') {
-        valA = (a.media_outlet ?? '').toLowerCase();
-        valB = (b.media_outlet ?? '').toLowerCase();
-      } else if (sortCol === 'type') {
-        valA = a.media_type ?? '';
-        valB = b.media_type ?? '';
-      } else if (sortCol === 'score') {
-        valA = a.quality_score ?? -1;
-        valB = b.quality_score ?? -1;
-      } else if (sortCol === 'last_contacted') {
-        valA = a.last_contacted_at ?? '';
-        valB = b.last_contacted_at ?? '';
-      }
+          if (valA === null || valA === '') return 1;
+          if (valB === null || valB === '') return -1;
+          if (valA < valB) return sortDir === 'asc' ? -1 : 1;
+          if (valA > valB) return sortDir === 'asc' ? 1 : -1;
+          return 0;
+        })
+      : list;
 
-      if (valA === null || valA === '') return 1;
-      if (valB === null || valB === '') return -1;
-      if (valA < valB) return sortDir === 'asc' ? -1 : 1;
-      if (valA > valB) return sortDir === 'asc' ? 1 : -1;
-      return 0;
+    // Always push journalists without email to the bottom
+    return sorted.sort((a, b) => {
+      const aHas = !!a.email?.trim();
+      const bHas = !!b.email?.trim();
+      if (aHas === bHas) return 0;
+      return aHas ? -1 : 1;
     });
   }, [journalists, search, mediaTypeFilter, selectedTags, sortCol, sortDir]);
 
@@ -462,7 +470,10 @@ export function JournalistsTable({ journalists }: JournalistsTableProps) {
               {paginated.map((journalist) => (
                 <TableRow
                   key={journalist.id}
-                  className={selectedIds.has(journalist.id) ? 'bg-hpr-gold/[0.04]' : ''}
+                  className={[
+                    selectedIds.has(journalist.id) ? 'bg-hpr-gold/[0.04]' : '',
+                    !journalist.email?.trim() ? 'opacity-50' : '',
+                  ].filter(Boolean).join(' ')}
                 >
                   <TableCell className="pr-0">
                     <input
