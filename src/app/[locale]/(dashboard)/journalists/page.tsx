@@ -36,17 +36,24 @@ export default async function JournalistsPage() {
     organizationId = profile?.organization_id ?? null;
 
     if (organizationId) {
-      // Service client pour contourner la limite max-rows de PostgREST (1000)
+      // Pagination pour contourner la limite max-rows PostgREST (1000 par défaut)
       const serviceClient = createServiceClient();
-      const { data } = await serviceClient
-        .from('journalists')
-        .select('*')
-        .or(`organization_id.eq.${organizationId},is_global.eq.true`)
-        .order('is_global', { ascending: true }) // journalistes perso en premier
-        .order('created_at', { ascending: false })
-        .limit(10000);
+      const PAGE = 1000;
+      let from = 0;
+      while (true) {
+        const { data: page } = await serviceClient
+          .from('journalists')
+          .select('*')
+          .or(`organization_id.eq.${organizationId},is_global.eq.true`)
+          .order('is_global', { ascending: true })
+          .order('created_at', { ascending: false })
+          .range(from, from + PAGE - 1);
 
-      journalists = data ?? [];
+        if (!page || page.length === 0) break;
+        journalists.push(...(page as JournalistRow[]));
+        if (page.length < PAGE) break;
+        from += PAGE;
+      }
     }
   }
 
