@@ -104,7 +104,8 @@ export default async function CampaignDetailPage({
     .select('*')
     .eq('is_opted_out', false)
     .order('quality_score', { ascending: false, nullsFirst: false })
-    .order('last_name', { ascending: true });
+    .order('last_name', { ascending: true })
+    .limit(10000);
 
   // Fetch email_sends for this campaign (with journalist + press release info)
   const { data: emailSends } = await supabase

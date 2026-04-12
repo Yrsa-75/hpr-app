@@ -41,7 +41,8 @@ export default async function JournalistsPage() {
         .select('*')
         .or(`organization_id.eq.${organizationId},is_global.eq.true`)
         .order('is_global', { ascending: true }) // journalistes perso en premier
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false })
+        .limit(10000);
 
       journalists = data ?? [];
     }
