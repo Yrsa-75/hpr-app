@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import { useTranslations } from 'next-intl';
-import { Search, Pencil, Trash2, Loader2, Tag, X, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
+import { Search, Pencil, Trash2, Loader2, Tag, X, ArrowUpDown, ArrowUp, ArrowDown, CheckCircle2 } from 'lucide-react';
 
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -29,7 +29,7 @@ import {
 } from '@/components/ui/popover';
 import { useToast } from '@/components/ui/use-toast';
 import { JournalistFormDialog } from '@/components/journalists/journalist-form-dialog';
-import { deleteJournalistAction } from '@/app/[locale]/(dashboard)/journalists/actions';
+import { deleteJournalistAction, bulkAddTagAction } from '@/app/[locale]/(dashboard)/journalists/actions';
 import type { JournalistRow } from '@/types/database';
 
 const PAGE_SIZE = 50;
@@ -85,6 +85,9 @@ export function JournalistsTable({ journalists }: JournalistsTableProps) {
   const [editingJournalist, setEditingJournalist] = React.useState<JournalistRow | null>(null);
   const [dialogOpen, setDialogOpen] = React.useState(false);
   const [deletingId, setDeletingId] = React.useState<string | null>(null);
+  const [selectedIds, setSelectedIds] = React.useState<Set<string>>(new Set());
+  const [isBulkLoading, setIsBulkLoading] = React.useState(false);
+  const selectAllRef = React.useRef<HTMLInputElement>(null);
 
   // Derive unique tags from all journalists — always include system tags
   const SYSTEM_TAGS = ['validate'];
@@ -188,6 +191,58 @@ export function JournalistsTable({ journalists }: JournalistsTableProps) {
 
   const paginated = filtered.slice(0, visibleCount);
   const hasMore = visibleCount < filtered.length;
+
+  // Selection helpers
+  const allPageSelected = paginated.length > 0 && paginated.every((j) => selectedIds.has(j.id));
+  const somePageSelected = paginated.some((j) => selectedIds.has(j.id)) && !allPageSelected;
+
+  React.useEffect(() => {
+    if (selectAllRef.current) {
+      selectAllRef.current.indeterminate = somePageSelected;
+    }
+  }, [somePageSelected]);
+
+  const toggleSelectAll = () => {
+    if (allPageSelected) {
+      setSelectedIds((prev) => {
+        const next = new Set(prev);
+        paginated.forEach((j) => next.delete(j.id));
+        return next;
+      });
+    } else {
+      setSelectedIds((prev) => {
+        const next = new Set(prev);
+        paginated.forEach((j) => next.add(j.id));
+        return next;
+      });
+    }
+  };
+
+  const toggleSelect = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  };
+
+  const handleBulkValidate = async () => {
+    setIsBulkLoading(true);
+    try {
+      const result = await bulkAddTagAction(Array.from(selectedIds), 'validate');
+      if (result.success) {
+        toast({
+          title: 'Emails vérifiés',
+          description: `${result.updated} journaliste${result.updated !== 1 ? 's' : ''} marqué${result.updated !== 1 ? 's' : ''} comme vérifié${result.updated !== 1 ? 's' : ''}.`,
+        });
+        setSelectedIds(new Set());
+      } else {
+        toast({ title: 'Erreur', description: result.error, variant: 'destructive' });
+      }
+    } finally {
+      setIsBulkLoading(false);
+    }
+  };
 
   const handleEdit = (journalist: JournalistRow) => {
     setEditingJournalist(journalist);
@@ -318,6 +373,37 @@ export function JournalistsTable({ journalists }: JournalistsTableProps) {
         )}
       </div>
 
+      {/* Bulk action bar */}
+      {selectedIds.size > 0 && (
+        <div className="flex items-center gap-3 rounded-lg border border-hpr-gold/25 bg-hpr-gold/5 px-4 py-2.5">
+          <span className="text-sm font-medium text-hpr-gold">
+            {selectedIds.size} journaliste{selectedIds.size > 1 ? 's' : ''} sélectionné{selectedIds.size > 1 ? 's' : ''}
+          </span>
+          <div className="flex-1" />
+          <Button
+            size="sm"
+            variant="gold"
+            onClick={handleBulkValidate}
+            disabled={isBulkLoading}
+            className="h-8 text-xs gap-1.5"
+          >
+            {isBulkLoading
+              ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              : <CheckCircle2 className="h-3.5 w-3.5" />}
+            Marquer comme vérifiés
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => setSelectedIds(new Set())}
+            disabled={isBulkLoading}
+            className="h-8 text-xs text-muted-foreground hover:text-foreground"
+          >
+            Annuler
+          </Button>
+        </div>
+      )}
+
       {/* Table */}
       {filtered.length === 0 ? (
         <div className="rounded-xl border border-white/[0.06] border-dashed bg-white/[0.01] p-12 text-center">
@@ -332,6 +418,16 @@ export function JournalistsTable({ journalists }: JournalistsTableProps) {
           <Table>
             <TableHeader>
               <TableRow className="hover:bg-transparent">
+                <TableHead className="w-8 pr-0">
+                  <input
+                    ref={selectAllRef}
+                    type="checkbox"
+                    checked={allPageSelected}
+                    onChange={toggleSelectAll}
+                    className="h-4 w-4 rounded border-white/20 cursor-pointer accent-[#B8860B]"
+                    title="Tout sélectionner"
+                  />
+                </TableHead>
                 <TableHead className="w-[220px]">
                   <button onClick={() => handleSort('name')} className="flex items-center text-xs font-medium hover:text-foreground transition-colors">
                     Nom <SortIcon col="name" />
@@ -364,7 +460,18 @@ export function JournalistsTable({ journalists }: JournalistsTableProps) {
             </TableHeader>
             <TableBody>
               {paginated.map((journalist) => (
-                <TableRow key={journalist.id}>
+                <TableRow
+                  key={journalist.id}
+                  className={selectedIds.has(journalist.id) ? 'bg-hpr-gold/[0.04]' : ''}
+                >
+                  <TableCell className="pr-0">
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.has(journalist.id)}
+                      onChange={() => toggleSelect(journalist.id)}
+                      className="h-4 w-4 rounded border-white/20 cursor-pointer accent-[#B8860B]"
+                    />
+                  </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-2.5">
                       <JournalistInitials

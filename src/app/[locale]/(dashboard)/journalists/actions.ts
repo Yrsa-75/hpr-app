@@ -241,6 +241,45 @@ export async function updateJournalistAction(
   return { success: true };
 }
 
+export async function bulkAddTagAction(
+  ids: string[],
+  tag: string
+): Promise<{ success: boolean; updated: number; error?: string }> {
+  if (!ids.length) return { success: true, updated: 0 };
+
+  const supabase = await createClient();
+  const organizationId = await getOrganizationId(supabase);
+  if (!organizationId) return { success: false, updated: 0, error: 'Non autorisé' };
+
+  // Fetch current tags for selected journalists in one query
+  const { data: rows, error: fetchError } = await supabase
+    .from('journalists')
+    .select('id, tags')
+    .in('id', ids)
+    .eq('organization_id', organizationId);
+
+  if (fetchError || !rows) {
+    return { success: false, updated: 0, error: fetchError?.message ?? 'Erreur de lecture' };
+  }
+
+  let updated = 0;
+  await Promise.all(
+    rows.map(async (journalist) => {
+      const currentTags = journalist.tags ?? [];
+      if (currentTags.includes(tag)) return; // already has the tag
+      const { error } = await supabase
+        .from('journalists')
+        .update({ tags: [...currentTags, tag], updated_at: new Date().toISOString() })
+        .eq('id', journalist.id)
+        .eq('organization_id', organizationId);
+      if (!error) updated++;
+    })
+  );
+
+  revalidatePath('/[locale]/(dashboard)/journalists', 'page');
+  return { success: true, updated };
+}
+
 export async function deleteJournalistAction(
   id: string
 ): Promise<JournalistFormState> {
