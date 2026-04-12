@@ -26,6 +26,7 @@ export async function getTargetingDataAction(campaignId: string): Promise<{
       .select('*')
       .eq('organization_id', orgId)
       .eq('is_opted_out', false)
+      .order('quality_score', { ascending: false, nullsFirst: false })
       .order('last_name', { ascending: true }),
     supabase
       .from('email_sends')
