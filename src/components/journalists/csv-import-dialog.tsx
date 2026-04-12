@@ -31,7 +31,7 @@ type Step = 'upload' | 'mapping' | 'preview' | 'result';
 const HPR_FIELDS = [
   { key: 'first_name', label: 'Prénom', required: true },
   { key: 'last_name', label: 'Nom', required: true },
-  { key: 'email', label: 'Email', required: true },
+  { key: 'email', label: 'Email', required: false },
   { key: 'phone', label: 'Téléphone', required: false },
   { key: 'phone_direct', label: 'Téléphone (Ligne directe)', required: false },
   { key: 'media_outlet', label: 'Nom du média', required: true },

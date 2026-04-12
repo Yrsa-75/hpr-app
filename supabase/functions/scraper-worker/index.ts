@@ -1,7 +1,13 @@
 // ============================================
-// HPR — scraper-worker Edge Function v7
+// HPR — scraper-worker Edge Function v12
 // Scraping autonome des médias français
 // Sources : HTML, RSS, Wikipedia, auteurs paginés, Twitter
+// Auto-amélioration :
+//   - Filtre les sources auto_disabled
+//   - Incrémente consecutive_failures, désactive à 5 échecs
+//   - Reset consecutive_failures sur succès
+//   - Cumule total_journalists_added
+//   - RSS autodiscovery si HTML retourne 404/403
 // ============================================
 
 import { createClient } from 'npm:@supabase/supabase-js@2';
@@ -102,6 +108,7 @@ async function getNextSources(limit: number): Promise<ScrapingSource[]> {
     .from('scraping_sources')
     .select('id, media_name, media_domain, team_page_url, feed_url, media_type, category, source_type, source_params, email_pattern')
     .eq('status', 'pending')
+    .eq('auto_disabled', false)
     .lte('next_scrape_at', new Date().toISOString())
     .order('priority', { ascending: true })
     .order('last_scraped_at', { ascending: true, nullsFirst: true })
@@ -121,17 +128,26 @@ async function markInProgress(sourceId: string): Promise<void> {
     .eq('id', sourceId);
 }
 
-async function markDone(sourceId: string, count: number): Promise<void> {
+async function markDone(sourceId: string, found: number, newlyAdded: number): Promise<void> {
   const nextScrape = new Date();
   nextScrape.setDate(nextScrape.getDate() + 30);
+
+  const { data: src } = await supabase
+    .from('scraping_sources')
+    .select('total_journalists_added')
+    .eq('id', sourceId)
+    .single();
+
   await supabase
     .from('scraping_sources')
     .update({
       status: 'done',
       last_scraped_at: new Date().toISOString(),
       next_scrape_at: nextScrape.toISOString(),
-      journalist_count_found: count,
+      journalist_count_found: found,
       error_message: null,
+      consecutive_failures: 0,
+      total_journalists_added: (src?.total_journalists_added ?? 0) + newlyAdded,
       updated_at: new Date().toISOString(),
     })
     .eq('id', sourceId);
@@ -161,15 +177,34 @@ async function markPendingWithProgress(
 async function markError(sourceId: string, error: string): Promise<void> {
   const nextScrape = new Date();
   nextScrape.setDate(nextScrape.getDate() + 7);
+
+  const { data: src } = await supabase
+    .from('scraping_sources')
+    .select('consecutive_failures')
+    .eq('id', sourceId)
+    .single();
+
+  const failures = (src?.consecutive_failures ?? 0) + 1;
+  const shouldDisable = failures >= 5;
+
+  const update: Record<string, unknown> = {
+    status: 'pending',
+    last_scraped_at: new Date().toISOString(),
+    next_scrape_at: nextScrape.toISOString(),
+    error_message: error.slice(0, 500),
+    consecutive_failures: failures,
+    updated_at: new Date().toISOString(),
+  };
+
+  if (shouldDisable) {
+    update.auto_disabled = true;
+    update.auto_disabled_reason = `Auto-désactivé après ${failures} échecs. Dernier : ${error.slice(0, 200)}`;
+    console.log(`[scraper] ⛔ Auto-désactivation source ${sourceId} (${failures} échecs consécutifs)`);
+  }
+
   await supabase
     .from('scraping_sources')
-    .update({
-      status: 'pending',
-      last_scraped_at: new Date().toISOString(),
-      next_scrape_at: nextScrape.toISOString(),
-      error_message: error.slice(0, 500),
-      updated_at: new Date().toISOString(),
-    })
+    .update(update)
     .eq('id', sourceId);
 }
 
@@ -283,15 +318,94 @@ ${content.slice(0, MAX_HTML_CHARS)}`;
 }
 
 // ============================================
+// RSS Autodiscovery
+// Essaye les chemins courants puis le <link> HTML
+// ============================================
+async function discoverRssFeed(domain: string): Promise<string | null> {
+  const baseDomain = domain.replace(/^(www\.|m\.)/, '');
+  const candidates = [
+    `https://${baseDomain}/feed`,
+    `https://${baseDomain}/rss`,
+    `https://${baseDomain}/feed.xml`,
+    `https://${baseDomain}/rss.xml`,
+    `https://${baseDomain}/atom.xml`,
+    `https://www.${baseDomain}/feed`,
+    `https://www.${baseDomain}/rss.xml`,
+    `https://${baseDomain}/flux-rss`,
+    `https://${baseDomain}/feeds/posts/default`,
+  ];
+
+  for (const url of candidates) {
+    try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 5_000);
+      try {
+        const res = await fetch(url, {
+          signal: controller.signal,
+          headers: { 'Accept': 'application/rss+xml, application/xml, text/xml, */*' },
+        });
+        if (res.ok) {
+          const text = await res.text();
+          if (text.includes('<rss') || text.includes('<feed') || text.includes('<channel')) {
+            console.log(`[rss-discovery] Trouvé : ${url}`);
+            return url;
+          }
+        }
+      } finally {
+        clearTimeout(timeout);
+      }
+    } catch { /* essai suivant */ }
+  }
+
+  // Dernier recours : chercher un <link type="application/rss+xml"> dans la homepage
+  try {
+    const homepage = await fetchPage(`https://${baseDomain}`);
+    const linkMatches = homepage.matchAll(/<link[^>]+>/gi);
+    for (const m of linkMatches) {
+      const tag = m[0];
+      if (tag.includes('rss+xml') || tag.includes('atom+xml')) {
+        const hrefMatch = tag.match(/href=["']([^"']+)["']/i);
+        if (hrefMatch) {
+          const href = hrefMatch[1];
+          const rssUrl = href.startsWith('http') ? href : `https://${baseDomain}${href.startsWith('/') ? '' : '/'}${href}`;
+          console.log(`[rss-discovery] Via <link> HTML : ${rssUrl}`);
+          return rssUrl;
+        }
+      }
+    }
+  } catch { /* non disponible */ }
+
+  return null;
+}
+
+// ============================================
 // Handler HTML classique
 // ============================================
 async function handleHtml(source: ScrapingSource): Promise<ExtractionResult> {
-  const html = await fetchPage(source.team_page_url);
-  const cleaned = cleanHtml(html);
-  const prompt = buildExtractionPrompt(cleaned, source.media_name);
-  const { text, inputTokens, outputTokens } = await callClaude(prompt);
-  const journalists = parseJournalistsFromJson(text);
-  return { journalists, inputTokens, outputTokens, hasMore: false };
+  try {
+    const html = await fetchPage(source.team_page_url);
+    const cleaned = cleanHtml(html);
+    const prompt = buildExtractionPrompt(cleaned, source.media_name);
+    const { text, inputTokens, outputTokens } = await callClaude(prompt);
+    const journalists = parseJournalistsFromJson(text);
+    return { journalists, inputTokens, outputTokens, hasMore: false };
+  } catch (err) {
+    const errMsg = err instanceof Error ? err.message : String(err);
+    // Sur 404 ou 403 : tenter la découverte RSS automatique
+    if (errMsg.includes('HTTP 404') || errMsg.includes('HTTP 403')) {
+      console.log(`[scraper] ${source.media_name}: ${errMsg} — tentative RSS autodiscovery`);
+      const rssUrl = await discoverRssFeed(source.media_domain);
+      if (rssUrl) {
+        // Mettre à jour la source en BDD pour les prochains runs
+        await supabase.from('scraping_sources')
+          .update({ source_type: 'rss', feed_url: rssUrl, updated_at: new Date().toISOString() })
+          .eq('id', source.id);
+        console.log(`[scraper] ${source.media_name}: basculé vers RSS ${rssUrl}`);
+        return handleRss({ ...source, source_type: 'rss', feed_url: rssUrl });
+      }
+    }
+    throw err;
+  }
 }
 
 // ============================================
@@ -823,7 +937,7 @@ async function upsertGlobalJournalists(
           is_global: true,
           first_name: firstName,
           last_name: lastName,
-          email: `noemail_${crypto.randomUUID()}@noemail.hpr`,
+          email: null,
           phone: j.phone ?? null,
           media_outlet: source.media_name,
           media_type: source.media_type,
@@ -930,7 +1044,7 @@ Deno.serve(async (req) => {
         }
 
         if (journalists.length === 0 && !hasMore) {
-          await markDone(source.id, 0);
+          await markDone(source.id, 0, 0);
           await logScrape(source.id, source.media_name, 'skipped_empty', 0, 0, inputTokens, outputTokens);
         } else {
           const { added, updated } = journalists.length > 0
@@ -941,7 +1055,7 @@ Deno.serve(async (req) => {
             // Source paginée avec suite
             await markPendingWithProgress(source.id, journalists.length, updatedParams);
           } else {
-            await markDone(source.id, journalists.length);
+            await markDone(source.id, journalists.length, added);
           }
 
           await logScrape(

@@ -17,7 +17,7 @@ const mediaTypeEnum = z.enum([
 const journalistSchema = z.object({
   first_name: z.string().min(1, 'Le prénom est obligatoire'),
   last_name: z.string().min(1, 'Le nom est obligatoire'),
-  email: z.string().email('Email invalide'),
+  email: z.string().email('Email invalide').optional(),
   phone: z.string().optional(),
   media_outlet: z.string().optional(),
   media_type: mediaTypeEnum.optional(),
@@ -42,7 +42,7 @@ export type JournalistFormState = {
 export type JournalistImport = {
   first_name: string;
   last_name: string;
-  email: string;
+  email?: string;
   phone?: string;
   phone_direct?: string;
   media_outlet?: string;
@@ -146,7 +146,7 @@ export async function createJournalistAction(
     organization_id: organizationId,
     first_name: parsed.data.first_name,
     last_name: parsed.data.last_name,
-    email: parsed.data.email,
+    email: parsed.data.email ?? null,
     phone: parsed.data.phone ?? null,
     media_outlet: parsed.data.media_outlet ?? null,
     media_type: parsed.data.media_type ?? null,
@@ -214,7 +214,7 @@ export async function updateJournalistAction(
     .update({
       first_name: parsed.data.first_name,
       last_name: parsed.data.last_name,
-      email: parsed.data.email,
+      email: parsed.data.email ?? null,
       phone: parsed.data.phone ?? null,
       media_outlet: parsed.data.media_outlet ?? null,
       media_type: parsed.data.media_type ?? null,
@@ -338,20 +338,15 @@ export async function importJournalistsAction(
       errorDetails.push({ row: rowNum, name, email, reason: 'Nom manquant' });
       continue;
     }
-    if (!journalist.email?.trim()) {
-      errors++;
-      errorDetails.push({ row: rowNum, name, email, reason: 'Email manquant' });
-      continue;
-    }
     if (!journalist.media_outlet?.trim()) {
       errors++;
       errorDetails.push({ row: rowNum, name, email, reason: 'Nom du média manquant' });
       continue;
     }
 
-    // Validate email format
+    // Validate email format (only if provided)
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(journalist.email.trim())) {
+    if (journalist.email?.trim() && !emailRegex.test(journalist.email.trim())) {
       errors++;
       errorDetails.push({ row: rowNum, name, email, reason: `Email invalide : "${journalist.email}"` });
       continue;
@@ -368,7 +363,7 @@ export async function importJournalistsAction(
       organization_id: organizationId,
       first_name: journalist.first_name.trim(),
       last_name: journalist.last_name.trim(),
-      email: journalist.email.trim().toLowerCase(),
+      email: journalist.email?.trim().toLowerCase() || null,
       phone: journalist.phone?.trim() || null,
       phone_direct: journalist.phone_direct?.trim() || null,
       media_outlet: journalist.media_outlet?.trim() || null,

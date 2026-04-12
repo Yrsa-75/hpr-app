@@ -252,13 +252,13 @@ Deno.serve(async (req) => {
 
   try {
     // Journalistes à vérifier :
-    // - ont un email réel (pas noemail_)
+    // - ont un email réel (non null)
     // - ont le tag email-pattern ou via-hunter
     // - n'ont PAS encore email-verified / non-existent / unverifiable
     const { data: journalists, error } = await supabase
       .from('journalists')
       .select('id, first_name, last_name, email, tags')
-      .not('email', 'like', 'noemail_%')
+      .not('email', 'is', null)
       .contains('tags', ['email-pattern']) // au moins ce tag
       .not('tags', 'cs', '{"email-verified"}')
       .not('tags', 'cs', '{"non-existent"}')
@@ -269,7 +269,7 @@ Deno.serve(async (req) => {
     const { data: hunterJournalists } = await supabase
       .from('journalists')
       .select('id, first_name, last_name, email, tags')
-      .not('email', 'like', 'noemail_%')
+      .not('email', 'is', null)
       .contains('tags', ['via-hunter'])
       .not('tags', 'cs', '{"email-verified"}')
       .not('tags', 'cs', '{"non-existent"}')

@@ -36,7 +36,7 @@ import type { JournalistRow } from '@/types/database';
 const journalistFormSchema = z.object({
   first_name: z.string().min(1, 'Le prénom est obligatoire'),
   last_name: z.string().min(1, 'Le nom est obligatoire'),
-  email: z.string().email('Email invalide'),
+  email: z.union([z.string().email('Email invalide'), z.literal('')]).optional(),
   phone: z.string().optional(),
   phone_direct: z.string().optional(),
   media_outlet: z.string().optional(),
@@ -231,7 +231,8 @@ export function JournalistFormDialog({
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <Label htmlFor="email" className="text-sm text-foreground/80">
-                {t('email')} <span className="text-red-400">*</span>
+                {t('email')}
+                <span className="ml-1.5 text-xs text-muted-foreground">(optionnel)</span>
               </Label>
               <Input
                 id="email"
