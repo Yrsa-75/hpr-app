@@ -1,0 +1,31 @@
+<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background -->
+  <rect width="512" height="512" rx="96" fill="#0A0A0B"/>
+
+  <!-- Staff -->
+  <line x1="256" y1="80" x2="256" y2="432" stroke="#B8860B" stroke-width="18" stroke-linecap="round"/>
+
+  <!-- Wings left -->
+  <path d="M256 130 C210 100, 140 95, 110 120 C145 102, 215 118, 256 148" fill="#B8860B" opacity="0.95"/>
+  <path d="M256 135 C215 105, 148 100, 120 126 C152 108, 218 122, 256 150" fill="#D4A017" opacity="0.5"/>
+
+  <!-- Wings right -->
+  <path d="M256 130 C302 100, 372 95, 402 120 C367 102, 297 118, 256 148" fill="#B8860B" opacity="0.95"/>
+  <path d="M256 135 C297 105, 364 100, 392 126 C360 108, 294 122, 256 150" fill="#D4A017" opacity="0.5"/>
+
+  <!-- Left snake -->
+  <path d="M256 155 C210 172, 192 210, 210 238 C226 262, 252 250, 235 278 C218 306, 200 336, 222 362 C238 380, 256 368, 256 432" stroke="#B8860B" stroke-width="16" stroke-linecap="round" fill="none"/>
+
+  <!-- Right snake -->
+  <path d="M256 155 C302 172, 320 210, 302 238 C286 262, 260 250, 277 278 C294 306, 312 336, 290 362 C274 380, 256 368, 256 432" stroke="#D4A017" stroke-width="16" stroke-linecap="round" fill="none"/>
+
+  <!-- Left snake head -->
+  <ellipse cx="210" cy="238" rx="22" ry="14" fill="#B8860B" transform="rotate(-20 210 238)"/>
+
+  <!-- Right snake head -->
+  <ellipse cx="302" cy="238" rx="22" ry="14" fill="#D4A017" transform="rotate(20 302 238)"/>
+
+  <!-- Top orb -->
+  <circle cx="256" cy="80" r="28" fill="#B8860B"/>
+  <circle cx="256" cy="80" r="15" fill="#FFD700" opacity="0.85"/>
+</svg>
