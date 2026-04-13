@@ -75,8 +75,8 @@ export function ReportTab({ campaign, client, pressRelease, emailSends, threads,
   const sends = emailSends.filter(s => s.status !== 'queued');
   const total = sends.length;
   const delivered = sends.filter(s => ['delivered', 'opened', 'clicked'].includes(s.status)).length;
-  const opened = sends.filter(s => ['opened', 'clicked'].includes(s.status)).length;
-  const clicked = sends.filter(s => s.status === 'clicked').length;
+  const opened = sends.filter(s => s.opened_at != null || s.clicked_at != null).length;
+  const clicked = sends.filter(s => s.clicked_at != null).length;
   const bounced = sends.filter(s => s.status === 'bounced').length;
   const failed = sends.filter(s => s.status === 'failed').length;
   const replied = threads.length;
