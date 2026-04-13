@@ -1,7 +1,8 @@
 'use client';
 
 import { useTranslations } from 'next-intl';
-import { Bell, Search, CheckCheck, Megaphone, FileText, Star, AlertCircle, Info } from 'lucide-react';
+import { Bell, Search, CheckCheck, Megaphone, FileText, Star, AlertCircle, Info, Sun, Moon } from 'lucide-react';
+import { useTheme } from 'next-themes';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import {
@@ -59,6 +60,7 @@ function timeAgo(dateStr: string) {
 
 export function Header({ user, notifications = [] }: HeaderProps) {
   const t = useTranslations('nav');
+  const { theme, setTheme } = useTheme();
 
   const displayName = user?.full_name || user?.email || 'User';
   const initials = getInitials(displayName);
@@ -80,6 +82,18 @@ export function Header({ user, notifications = [] }: HeaderProps) {
 
       {/* Right actions */}
       <div className="flex items-center gap-3">
+        {/* Theme toggle */}
+        <Button
+          variant="ghost"
+          size="icon"
+          className="text-muted-foreground hover:text-foreground"
+          onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+        >
+          <Sun className="h-4 w-4 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
+          <Moon className="absolute h-4 w-4 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
+          <span className="sr-only">Changer de thème</span>
+        </Button>
+
         {/* Notifications */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
