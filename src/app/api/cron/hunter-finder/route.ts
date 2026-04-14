@@ -65,7 +65,7 @@ export async function GET(req: NextRequest) {
 
         if (result.found && result.email) {
           found++;
-          const tags = [...new Set([...(j.tags ?? []).filter((t) => t !== 'hunter-tried'), 'via-hunter'])];
+          const tags = [...new Set([...(j.tags ?? []).filter((t: string) => t !== 'hunter-tried'), 'via-hunter'])];
           await supabase.from('journalists').update({
             email: result.email.toLowerCase(),
             tags,

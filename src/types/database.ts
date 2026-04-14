@@ -675,6 +675,53 @@ export type Database = {
           },
         ];
       };
+      background_tasks: {
+        Row: {
+          id: string;
+          type: 'hunter_finder' | 'hunter_verifier' | 'google_news';
+          status: 'running' | 'completed' | 'failed';
+          started_at: string;
+          completed_at: string | null;
+          total: number | null;
+          processed: number | null;
+          found: number | null;
+          skipped: number | null;
+          failed_count: number | null;
+          credits_used: number | null;
+          error_message: string | null;
+          details: Json | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          type: 'hunter_finder' | 'hunter_verifier' | 'google_news';
+          status?: 'running' | 'completed' | 'failed';
+          started_at?: string;
+          completed_at?: string | null;
+          total?: number | null;
+          processed?: number | null;
+          found?: number | null;
+          skipped?: number | null;
+          failed_count?: number | null;
+          credits_used?: number | null;
+          error_message?: string | null;
+          details?: Json | null;
+          created_at?: string;
+        };
+        Update: {
+          status?: 'running' | 'completed' | 'failed';
+          completed_at?: string | null;
+          total?: number | null;
+          processed?: number | null;
+          found?: number | null;
+          skipped?: number | null;
+          failed_count?: number | null;
+          credits_used?: number | null;
+          error_message?: string | null;
+          details?: Json | null;
+        };
+        Relationships: [];
+      };
     };
     Views: Record<string, {
       Row: Record<string, unknown>;

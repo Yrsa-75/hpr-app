@@ -108,28 +108,20 @@ export default async function ImprovementsPage() {
   const t = await getTranslations('improvements');
   const supabase = await createClient();
 
-  // Stats journalistes
-  const { data: journalistStats } = await supabase.rpc('get_journalist_enrichment_stats').single() as unknown as
-    { data: { total: number; with_email: number; to_search: number; hunter_tried: number; verified: number } | null };
+  // Stats journalistes — requête directe
+  const stats = { total: 0, with_email: 0, to_search: 0, hunter_tried: 0, verified: 0 };
+  const { data: rows } = await supabase
+    .from('journalists')
+    .select('email, is_opted_out, tags');
 
-  // Fallback si la fonction RPC n'existe pas encore — requête directe
-  let stats = { total: 0, with_email: 0, to_search: 0, hunter_tried: 0, verified: 0 };
-  if (journalistStats) {
-    stats = journalistStats;
-  } else {
-    const { data: rows } = await supabase
-      .from('journalists')
-      .select('email, is_opted_out, tags');
-
-    if (rows) {
-      stats.total = rows.filter((r) => !r.is_opted_out).length;
-      stats.with_email = rows.filter((r) => !r.is_opted_out && r.email).length;
-      stats.to_search = rows.filter((r) => !r.is_opted_out && !r.email && !(r.tags as string[] | null)?.includes('hunter-tried')).length;
-      stats.hunter_tried = rows.filter((r) => !r.is_opted_out && !r.email && (r.tags as string[] | null)?.includes('hunter-tried')).length;
-      stats.verified = rows.filter((r) => !r.is_opted_out && r.email && (
-        (r.tags as string[] | null)?.some((t) => ['email-verified', 'validate', 'via-hunter'].includes(t))
-      )).length;
-    }
+  if (rows) {
+    stats.total = rows.filter((r) => !r.is_opted_out).length;
+    stats.with_email = rows.filter((r) => !r.is_opted_out && r.email).length;
+    stats.to_search = rows.filter((r) => !r.is_opted_out && !r.email && !(r.tags as string[] | null)?.includes('hunter-tried')).length;
+    stats.hunter_tried = rows.filter((r) => !r.is_opted_out && !r.email && (r.tags as string[] | null)?.includes('hunter-tried')).length;
+    stats.verified = rows.filter((r) => !r.is_opted_out && r.email && (
+      (r.tags as string[] | null)?.some((t) => ['email-verified', 'validate', 'via-hunter'].includes(t))
+    )).length;
   }
 
   // Historique des tâches (10 derniers runs par type)
