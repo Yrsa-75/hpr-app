@@ -517,7 +517,7 @@ export type Database = {
           press_release_id: string;
           journalist_id: string;
           resend_email_id: string | null;
-          status: 'queued' | 'sent' | 'delivered' | 'opened' | 'clicked' | 'bounced' | 'complained' | 'failed';
+          status: 'queued' | 'sent' | 'delivered' | 'opened' | 'clicked' | 'bounced' | 'complained' | 'failed' | 'unsubscribed';
           sent_at: string | null;
           opened_at: string | null;
           clicked_at: string | null;
@@ -533,7 +533,7 @@ export type Database = {
           press_release_id: string;
           journalist_id: string;
           resend_email_id?: string | null;
-          status?: 'queued' | 'sent' | 'delivered' | 'opened' | 'clicked' | 'bounced' | 'complained' | 'failed';
+          status?: 'queued' | 'sent' | 'delivered' | 'opened' | 'clicked' | 'bounced' | 'complained' | 'failed' | 'unsubscribed';
           sent_at?: string | null;
           opened_at?: string | null;
           clicked_at?: string | null;
@@ -549,7 +549,7 @@ export type Database = {
           press_release_id?: string;
           journalist_id?: string;
           resend_email_id?: string | null;
-          status?: 'queued' | 'sent' | 'delivered' | 'opened' | 'clicked' | 'bounced' | 'complained' | 'failed';
+          status?: 'queued' | 'sent' | 'delivered' | 'opened' | 'clicked' | 'bounced' | 'complained' | 'failed' | 'unsubscribed';
           sent_at?: string | null;
           opened_at?: string | null;
           clicked_at?: string | null;
