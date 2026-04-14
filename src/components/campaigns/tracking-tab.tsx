@@ -82,7 +82,7 @@ function SendGroup({ prId, sends, campaignId }: SendGroupProps) {
     opened: sent.filter((s) => s.opened_at != null || s.clicked_at != null).length,
     clicked: sent.filter((s) => s.clicked_at != null).length,
     bounced: sent.filter((s) => s.status === 'bounced').length,
-    complained: sent.filter((s) => s.status === 'complained').length,
+    complained: sent.filter((s) => s.status === 'complained' || s.status === 'unsubscribed').length,
   };
 
   const handleSort = (col: 'sent_at' | 'opened_at' | 'status') => {
@@ -146,6 +146,7 @@ function SendGroup({ prId, sends, campaignId }: SendGroupProps) {
     clicked: { label: 'Cliqué', color: 'text-hpr-gold' },
     bounced: { label: 'Rejeté', color: 'text-red-400' },
     complained: { label: 'Spam', color: 'text-red-400' },
+    unsubscribed: { label: 'Désinscrit', color: 'text-amber-400' },
     failed: { label: 'Échec', color: 'text-red-400' },
   };
 

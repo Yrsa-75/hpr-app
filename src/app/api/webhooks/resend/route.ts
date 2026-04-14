@@ -98,13 +98,19 @@ async function handleEvent(body: ResendWebhookEvent) {
       return NextResponse.json({ ok: true });
   }
 
-  // For clicked events, only set opened_at if not already set
+  // For clicked events, only set opened_at if not already set,
+  // and never overwrite an 'unsubscribed' status (unsubscribe link click)
   if (body.type === 'email.clicked' && updates.opened_at) {
     const { opened_at, ...otherUpdates } = updates;
-    await supabase.from('email_sends').update(otherUpdates).eq('resend_email_id', emailId);
+    await supabase.from('email_sends').update(otherUpdates).eq('resend_email_id', emailId).neq('status', 'unsubscribed');
     await supabase.from('email_sends').update({ opened_at }).eq('resend_email_id', emailId).is('opened_at', null);
   } else {
-    await supabase.from('email_sends').update(updates).eq('resend_email_id', emailId);
+    const q = supabase.from('email_sends').update(updates).eq('resend_email_id', emailId);
+    if (body.type === 'email.clicked') {
+      await q.neq('status', 'unsubscribed');
+    } else {
+      await q;
+    }
   }
 
   // Sur open/click : mettre à jour le quality_score du journaliste

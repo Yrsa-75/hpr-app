@@ -16,17 +16,27 @@ async function processUnsubscribe(sendId: string): Promise<'ok' | 'already' | 'i
 
   const { data: journalist } = await supabase
     .from('journalists')
-    .select('id, is_opted_out')
+    .select('id, is_opted_out, tags')
     .eq('id', send.journalist_id)
     .single();
 
   if (!journalist) return 'invalid';
   if (journalist.is_opted_out) return 'already';
 
-  await supabase
-    .from('journalists')
-    .update({ is_opted_out: true })
-    .eq('id', journalist.id);
+  const now = new Date().toISOString();
+  const currentTags: string[] = (journalist as { tags?: string[] }).tags ?? [];
+  const newTags = [...new Set([...currentTags, 'opted-out'])];
+
+  await Promise.all([
+    supabase
+      .from('journalists')
+      .update({ is_opted_out: true, tags: newTags, updated_at: now })
+      .eq('id', journalist.id),
+    supabase
+      .from('email_sends')
+      .update({ status: 'unsubscribed' })
+      .eq('id', sendId),
+  ]);
 
   return 'ok';
 }
