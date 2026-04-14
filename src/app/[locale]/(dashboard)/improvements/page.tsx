@@ -3,7 +3,7 @@ import { getTranslations } from 'next-intl/server';
 import { createClient } from '@/lib/supabase/server';
 import {
   Search, ShieldCheck, Newspaper, CheckCircle2,
-  XCircle, Clock, AlertTriangle, Users, Mail,
+  XCircle, Clock, Users, Mail,
 } from 'lucide-react';
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -325,11 +325,7 @@ export default async function ImprovementsPage() {
                 <RunsHistory runs={taskRuns.google_news} />
               </div>
             ) : (
-              <div className="flex items-center gap-2 text-xs text-amber-400/80">
-                <AlertTriangle className="h-3.5 w-3.5 flex-shrink-0" />
-                Le cron Google News ne logue pas encore ses runs dans cette table.
-                Les retombées sont bien détectées mais l&apos;historique n&apos;est pas visible ici.
-              </div>
+              <p className="text-xs text-muted-foreground/60 italic">Premier run aujourd&apos;hui à 12h</p>
             )}
           </div>
         </div>
