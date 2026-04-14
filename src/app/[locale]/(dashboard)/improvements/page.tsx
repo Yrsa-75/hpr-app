@@ -108,21 +108,28 @@ export default async function ImprovementsPage() {
   const t = await getTranslations('improvements');
   const supabase = await createClient();
 
-  // Stats journalistes — requête directe
-  const stats = { total: 0, with_email: 0, to_search: 0, hunter_tried: 0, verified: 0 };
-  const { data: rows } = await supabase
-    .from('journalists')
-    .select('email, is_opted_out, tags');
+  // Stats journalistes — comptages directs en base (évite la limite PostgREST ~1000 lignes)
+  const [
+    { count: total },
+    { count: with_email },
+    { count: to_search },
+    { count: hunter_tried },
+    { count: verified },
+  ] = await Promise.all([
+    supabase.from('journalists').select('*', { count: 'exact', head: true }).eq('is_opted_out', false),
+    supabase.from('journalists').select('*', { count: 'exact', head: true }).eq('is_opted_out', false).not('email', 'is', null),
+    supabase.from('journalists').select('*', { count: 'exact', head: true }).eq('is_opted_out', false).is('email', null).not('tags', 'cs', '{"hunter-tried"}'),
+    supabase.from('journalists').select('*', { count: 'exact', head: true }).eq('is_opted_out', false).is('email', null).contains('tags', ['hunter-tried']),
+    supabase.from('journalists').select('*', { count: 'exact', head: true }).eq('is_opted_out', false).not('email', 'is', null).or('tags.cs.{"email-verified"},tags.cs.{"validate"},tags.cs.{"via-hunter"}'),
+  ]);
 
-  if (rows) {
-    stats.total = rows.filter((r) => !r.is_opted_out).length;
-    stats.with_email = rows.filter((r) => !r.is_opted_out && r.email).length;
-    stats.to_search = rows.filter((r) => !r.is_opted_out && !r.email && !(r.tags as string[] | null)?.includes('hunter-tried')).length;
-    stats.hunter_tried = rows.filter((r) => !r.is_opted_out && !r.email && (r.tags as string[] | null)?.includes('hunter-tried')).length;
-    stats.verified = rows.filter((r) => !r.is_opted_out && r.email && (
-      (r.tags as string[] | null)?.some((t) => ['email-verified', 'validate', 'via-hunter'].includes(t))
-    )).length;
-  }
+  const stats = {
+    total: total ?? 0,
+    with_email: with_email ?? 0,
+    to_search: to_search ?? 0,
+    hunter_tried: hunter_tried ?? 0,
+    verified: verified ?? 0,
+  };
 
   // Historique des tâches (10 derniers runs par type)
   const taskTypes: TaskType[] = ['hunter_finder', 'hunter_verifier', 'google_news'];
