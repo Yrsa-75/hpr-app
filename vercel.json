@@ -6,7 +6,7 @@
     },
     {
       "path": "/api/cron/hunter-finder",
-      "schedule": "0 */4 * * *"
+      "schedule": "0 8 * * *"
     },
     {
       "path": "/api/cron/hunter-verifier",
