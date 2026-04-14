@@ -374,7 +374,7 @@ export function TrackingTab({ emailSends, campaignId }: TrackingTabProps) {
     return Array.from(map.entries()).sort(([, a], [, b]) => {
       const dateA = a.find((s) => s.sent_at)?.sent_at ?? '';
       const dateB = b.find((s) => s.sent_at)?.sent_at ?? '';
-      return dateA < dateB ? -1 : dateA > dateB ? 1 : 0;
+      return dateA < dateB ? 1 : dateA > dateB ? -1 : 0;
     });
   }, [emailSends]);
 
