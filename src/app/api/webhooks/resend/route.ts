@@ -92,6 +92,7 @@ async function handleEvent(body: ResendWebhookEvent) {
     }
     case 'email.complained':
       updates.status = 'complained';
+      updates.complained_at = now;
       break;
     default:
       return NextResponse.json({ ok: true });
@@ -122,6 +123,32 @@ async function handleEvent(body: ResendWebhookEvent) {
         await supabase
           .from('journalists')
           .update({ quality_score: newScore, updated_at: now })
+          .eq('id', send.journalist_id);
+      }
+    }
+  }
+
+  // Sur un complained : marquer le journaliste comme désinscrit (opt-out RGPD)
+  if (body.type === 'email.complained') {
+    const { data: send } = await supabase
+      .from('email_sends')
+      .select('journalist_id')
+      .eq('resend_email_id', emailId)
+      .single();
+
+    if (send?.journalist_id) {
+      const { data: journalist } = await supabase
+        .from('journalists')
+        .select('tags')
+        .eq('id', send.journalist_id)
+        .single();
+
+      if (journalist) {
+        const currentTags: string[] = journalist.tags ?? [];
+        const newTags = [...new Set([...currentTags, 'opted-out'])];
+        await supabase
+          .from('journalists')
+          .update({ is_opted_out: true, tags: newTags, updated_at: now })
           .eq('id', send.journalist_id);
       }
     }

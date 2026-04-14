@@ -98,11 +98,13 @@ export default async function CampaignDetailPage({
     .limit(1)
     .maybeSingle();
 
-  // Fetch org journalists (for targeting) — triés par score décroissant
+  // Fetch org journalists (for targeting) — exclut désinscrits et bounced
   const { data: journalists } = await supabase
     .from('journalists')
     .select('*')
     .eq('is_opted_out', false)
+    .not('email', 'is', null)
+    .not('tags', 'cs', '{"email-bounced"}')
     .order('quality_score', { ascending: false, nullsFirst: false })
     .order('last_name', { ascending: true })
     .limit(10000);

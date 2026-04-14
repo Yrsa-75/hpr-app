@@ -580,12 +580,21 @@ export function JournalistsTable({ journalists }: JournalistsTableProps) {
                         lastName={journalist.last_name}
                       />
                       <div className="min-w-0">
-                        <p className="text-sm font-medium text-foreground truncate">
-                          {journalist.first_name} {journalist.last_name}
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <p className="text-sm font-medium text-foreground truncate">
+                            {journalist.first_name} {journalist.last_name}
+                          </p>
                           {journalist.is_opted_out && (
-                            <span className="ml-1 text-red-400 text-xs" title="Désinscrit">STOP</span>
+                            <span className="inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-semibold bg-red-500/15 text-red-400 border border-red-500/30 leading-none">
+                              Désinscrit
+                            </span>
                           )}
-                        </p>
+                          {journalist.tags?.includes('email-bounced') && (
+                            <span className="inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-semibold bg-orange-500/15 text-orange-400 border border-orange-500/30 leading-none">
+                              Bounce
+                            </span>
+                          )}
+                        </div>
                         <p className="text-xs text-muted-foreground truncate flex items-center gap-1">
                           {journalist.email}
                           {journalist.tags?.includes('validate') && (
@@ -638,7 +647,7 @@ export function JournalistsTable({ journalists }: JournalistsTableProps) {
                                 ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20'
                                 : tag === 'email-verified'
                                 ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
-                                : tag === 'non-existent'
+                                : tag === 'non-existent' || tag === 'email-bounced' || tag === 'opted-out'
                                 ? 'bg-red-500/10 text-red-400 border border-red-500/20'
                                 : tag === 'unverifiable'
                                 ? 'bg-zinc-500/10 text-zinc-400 border border-zinc-500/20'
