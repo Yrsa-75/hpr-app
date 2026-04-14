@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import { getTranslations } from 'next-intl/server';
-import { createClient } from '@/lib/supabase/server';
+import { createClient, createServiceClient } from '@/lib/supabase/server';
 import {
   Search, ShieldCheck, Newspaper, CheckCircle2,
   XCircle, Clock, Users, Mail,
@@ -107,6 +107,19 @@ function RunsHistory({ runs }: { runs: BackgroundTask[] }) {
 export default async function ImprovementsPage() {
   const t = await getTranslations('improvements');
   const supabase = await createClient();
+  const serviceClient = createServiceClient();
+
+  // Récupérer l'organization_id de l'utilisateur courant
+  const { data: { user } } = await supabase.auth.getUser();
+  let organizationId: string | null = null;
+  if (user) {
+    const { data: profile } = await supabase.from('users').select('organization_id').eq('id', user.id).single();
+    organizationId = profile?.organization_id ?? null;
+  }
+
+  // Filtre de base : org courante + journalistes globaux, sans les opt-out
+  // neq('is_opted_out', true) matche aussi les valeurs NULL (cohérent avec la page journalistes)
+  const orgFilter = `organization_id.eq.${organizationId},is_global.eq.true`;
 
   // Stats journalistes — comptages directs en base (évite la limite PostgREST ~1000 lignes)
   const [
@@ -116,11 +129,11 @@ export default async function ImprovementsPage() {
     { count: hunter_tried },
     { count: verified },
   ] = await Promise.all([
-    supabase.from('journalists').select('*', { count: 'exact', head: true }).eq('is_opted_out', false),
-    supabase.from('journalists').select('*', { count: 'exact', head: true }).eq('is_opted_out', false).not('email', 'is', null),
-    supabase.from('journalists').select('*', { count: 'exact', head: true }).eq('is_opted_out', false).is('email', null).not('tags', 'cs', '{"hunter-tried"}'),
-    supabase.from('journalists').select('*', { count: 'exact', head: true }).eq('is_opted_out', false).is('email', null).contains('tags', ['hunter-tried']),
-    supabase.from('journalists').select('*', { count: 'exact', head: true }).eq('is_opted_out', false).not('email', 'is', null).or('tags.cs.{"email-verified"},tags.cs.{"validate"},tags.cs.{"via-hunter"}'),
+    serviceClient.from('journalists').select('*', { count: 'exact', head: true }).or(orgFilter).neq('is_opted_out', true),
+    serviceClient.from('journalists').select('*', { count: 'exact', head: true }).or(orgFilter).neq('is_opted_out', true).not('email', 'is', null),
+    serviceClient.from('journalists').select('*', { count: 'exact', head: true }).or(orgFilter).neq('is_opted_out', true).is('email', null).not('tags', 'cs', '{"hunter-tried"}'),
+    serviceClient.from('journalists').select('*', { count: 'exact', head: true }).or(orgFilter).neq('is_opted_out', true).is('email', null).contains('tags', ['hunter-tried']),
+    serviceClient.from('journalists').select('*', { count: 'exact', head: true }).or(orgFilter).neq('is_opted_out', true).not('email', 'is', null).or('tags.cs.{"email-verified"},tags.cs.{"validate"},tags.cs.{"via-hunter"}'),
   ]);
 
   const stats = {
