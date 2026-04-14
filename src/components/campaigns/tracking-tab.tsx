@@ -365,7 +365,9 @@ export function TrackingTab({ emailSends, campaignId }: TrackingTabProps) {
   const groups = React.useMemo(() => {
     const map = new Map<string, EmailSendWithJoins[]>();
     for (const s of emailSends) {
-      const day = s.sent_at ? new Date(s.sent_at).toISOString().slice(0, 10) : 'pending';
+      const day = (s.sent_at ?? s.created_at)
+        ? new Date((s.sent_at ?? s.created_at)!).toISOString().slice(0, 10)
+        : 'unknown';
       const key = `${s.press_release_id}_${day}`;
       if (!map.has(key)) map.set(key, []);
       map.get(key)!.push(s);
