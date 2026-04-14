@@ -3,6 +3,14 @@
     {
       "path": "/api/cron/monitor",
       "schedule": "0 12 * * *"
+    },
+    {
+      "path": "/api/cron/hunter-finder",
+      "schedule": "0 */4 * * *"
+    },
+    {
+      "path": "/api/cron/hunter-verifier",
+      "schedule": "0 7 * * *"
     }
   ]
 }
