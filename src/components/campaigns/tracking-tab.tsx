@@ -82,7 +82,8 @@ function SendGroup({ prId, sends, campaignId }: SendGroupProps) {
     opened: sent.filter((s) => s.opened_at != null || s.clicked_at != null).length,
     clicked: sent.filter((s) => s.clicked_at != null).length,
     bounced: sent.filter((s) => s.status === 'bounced').length,
-    complained: sent.filter((s) => s.status === 'complained' || s.status === 'unsubscribed').length,
+    unsubscribed: sent.filter((s) => s.status === 'unsubscribed').length,
+    complained: sent.filter((s) => s.status === 'complained').length,
   };
 
   const handleSort = (col: 'sent_at' | 'opened_at' | 'status') => {
@@ -171,12 +172,12 @@ function SendGroup({ prId, sends, campaignId }: SendGroupProps) {
         <StatCard icon={Eye}          label="Ouverts"     count={counts.opened}       total={total} color="text-emerald-400" />
         <StatCard icon={MousePointer} label="Cliqués"     count={counts.clicked}      total={total} color="text-hpr-gold"    />
         <StatCard icon={XCircle}      label="Bounces"     count={counts.bounced}      total={total} color="text-red-400"     />
-        <StatCard icon={UserX}        label="Désinscrits" count={counts.complained}   total={total} color="text-amber-400"   />
+        <StatCard icon={UserX}        label="Désinscrits" count={counts.unsubscribed} total={total} color="text-amber-400"   />
       </div>
 
-      {/* ── Complaints warning ── */}
+      {/* ── Complaints warning (spam uniquement, pas les désinscrits) ── */}
       {counts.complained > 0 && (
-        <div className="mx-4 mb-3 flex items-center gap-2 text-xs text-amber-400 bg-amber-950/20 border border-amber-500/20 rounded-lg px-3 py-2">
+        <div className="mx-4 mb-3 flex items-center gap-2 text-xs text-red-400 bg-red-950/20 border border-red-500/20 rounded-lg px-3 py-2">
           <AlertTriangle className="h-3.5 w-3.5 flex-shrink-0" />
           {counts.complained} signalement{counts.complained > 1 ? 's' : ''} comme spam — vérifiez votre liste de contacts.
         </div>
