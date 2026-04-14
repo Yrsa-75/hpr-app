@@ -360,11 +360,13 @@ export function TrackingTab({ emailSends, campaignId }: TrackingTabProps) {
     return () => clearInterval(interval);
   }, [hasPending, refresh]);
 
-  // Group by press_release_id, preserve chronological order (oldest first)
+  // Group by press_release_id + send date (day), so two sends of the same
+  // press release on different days produce separate accordions.
   const groups = React.useMemo(() => {
     const map = new Map<string, EmailSendWithJoins[]>();
     for (const s of emailSends) {
-      const key = s.press_release_id;
+      const day = s.sent_at ? new Date(s.sent_at).toISOString().slice(0, 10) : 'pending';
+      const key = `${s.press_release_id}_${day}`;
       if (!map.has(key)) map.set(key, []);
       map.get(key)!.push(s);
     }
