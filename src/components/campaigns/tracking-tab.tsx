@@ -4,7 +4,7 @@ import * as React from 'react';
 import { useRouter } from 'next/navigation';
 import {
   Mail, Eye, MousePointer, XCircle, AlertTriangle, Clock,
-  RefreshCw, Trash2, ChevronUp, ChevronDown, ChevronsUpDown,
+  RefreshCw, Trash2, ChevronUp, ChevronDown, ChevronsUpDown, UserX,
 } from 'lucide-react';
 import type { EmailSendWithJoins } from '@/components/campaigns/sending-tab';
 import { deleteEmailSendsAction } from '@/app/[locale]/(dashboard)/clients/[clientId]/campaigns/[campaignId]/actions';
@@ -165,11 +165,12 @@ function SendGroup({ prId, sends, campaignId }: SendGroupProps) {
       </div>
 
       {/* ── KPI cards ── */}
-      <div className="p-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <StatCard icon={Mail}         label="Envoyés"  count={total}          total={total} color="text-blue-400"    />
-        <StatCard icon={Eye}          label="Ouverts"  count={counts.opened}  total={total} color="text-emerald-400" />
-        <StatCard icon={MousePointer} label="Cliqués"  count={counts.clicked} total={total} color="text-hpr-gold"    />
-        <StatCard icon={XCircle}      label="Bounces"  count={counts.bounced} total={total} color="text-red-400"     />
+      <div className="p-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+        <StatCard icon={Mail}         label="Envoyés"     count={total}               total={total} color="text-blue-400"    />
+        <StatCard icon={Eye}          label="Ouverts"     count={counts.opened}       total={total} color="text-emerald-400" />
+        <StatCard icon={MousePointer} label="Cliqués"     count={counts.clicked}      total={total} color="text-hpr-gold"    />
+        <StatCard icon={XCircle}      label="Bounces"     count={counts.bounced}      total={total} color="text-red-400"     />
+        <StatCard icon={UserX}        label="Désinscrits" count={counts.complained}   total={total} color="text-amber-400"   />
       </div>
 
       {/* ── Complaints warning ── */}
