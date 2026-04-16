@@ -163,7 +163,7 @@ export function SendingTab({ campaignId, pressRelease, emailSends, client }: Sen
         )}
       </div>
 
-      {/* Already sent — grouped by press release */}
+      {/* Already sent — one accordion per batch day */}
       {alreadySent.length > 0 && (
         <SendHistory sends={alreadySent} />
       )}
@@ -172,15 +172,19 @@ export function SendingTab({ campaignId, pressRelease, emailSends, client }: Sen
 }
 
 function SendHistory({ sends }: { sends: EmailSendWithJoins[] }) {
-  const [expandedPr, setExpandedPr] = React.useState<string | null>(null);
+  const [expandedKey, setExpandedKey] = React.useState<string | null>(null);
 
-  // Group by press_release_id
-  const groups = sends.reduce<Record<string, EmailSendWithJoins[]>>((acc, send) => {
-    const key = send.press_release_id;
+  // Group by date of sent_at (YYYY-MM-DD), newest first
+  const groupMap = sends.reduce<Record<string, EmailSendWithJoins[]>>((acc, send) => {
+    const key = send.sent_at
+      ? send.sent_at.slice(0, 10)
+      : 'sans-date';
     if (!acc[key]) acc[key] = [];
     acc[key].push(send);
     return acc;
   }, {});
+
+  const groups = Object.entries(groupMap).sort(([a], [b]) => b.localeCompare(a));
 
   return (
     <div className="space-y-2">
@@ -189,11 +193,17 @@ function SendHistory({ sends }: { sends: EmailSendWithJoins[] }) {
         Historique des envois ({sends.length} email{sends.length > 1 ? 's' : ''})
       </h3>
       <div className="space-y-2">
-        {Object.entries(groups).map(([prId, groupSends]) => {
-          const firstSend = groupSends[0];
-          const prTitle = firstSend.press_releases?.title ?? 'Communiqué';
-          const sentAt = groupSends.find(s => s.sent_at)?.sent_at;
-          const isExpanded = expandedPr === prId;
+        {groups.map(([dateKey, groupSends]) => {
+          const isExpanded = expandedKey === dateKey;
+
+          const label = dateKey === 'sans-date'
+            ? 'Date inconnue'
+            : new Date(dateKey).toLocaleDateString('fr-FR', {
+                weekday: 'long',
+                day: '2-digit',
+                month: 'long',
+                year: 'numeric',
+              });
 
           const statusCounts = groupSends.reduce<Record<string, number>>((acc, s) => {
             acc[s.status] = (acc[s.status] ?? 0) + 1;
@@ -201,23 +211,12 @@ function SendHistory({ sends }: { sends: EmailSendWithJoins[] }) {
           }, {});
 
           return (
-            <div key={prId} className="rounded-xl border border-white/[0.08] overflow-hidden">
+            <div key={dateKey} className="rounded-xl border border-white/[0.08] overflow-hidden">
               {/* Group header */}
               <div className="flex items-center justify-between px-4 py-3 bg-white/[0.02]">
                 <div className="min-w-0 flex-1">
-                  <p className="text-sm font-medium text-foreground truncate">{prTitle}</p>
+                  <p className="text-sm font-medium text-foreground capitalize">{label}</p>
                   <div className="flex items-center gap-3 mt-0.5 flex-wrap">
-                    {sentAt && (
-                      <span className="text-xs text-muted-foreground/70">
-                        {new Date(sentAt).toLocaleDateString('fr-FR', {
-                          day: '2-digit',
-                          month: 'short',
-                          year: 'numeric',
-                          hour: '2-digit',
-                          minute: '2-digit',
-                        })}
-                      </span>
-                    )}
                     <div className="flex items-center gap-2 text-xs">
                       {Object.entries(statusCounts).map(([status, count]) => {
                         const cfg = STATUS_CONFIG[status] ?? STATUS_CONFIG.sent;
@@ -231,7 +230,7 @@ function SendHistory({ sends }: { sends: EmailSendWithJoins[] }) {
                   </div>
                 </div>
                 <button
-                  onClick={() => setExpandedPr(isExpanded ? null : prId)}
+                  onClick={() => setExpandedKey(isExpanded ? null : dateKey)}
                   className="ml-3 flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors flex-shrink-0"
                 >
                   {groupSends.length} journaliste{groupSends.length > 1 ? 's' : ''}
