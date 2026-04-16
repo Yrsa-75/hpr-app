@@ -26,6 +26,8 @@ export async function getTargetingDataAction(campaignId: string): Promise<{
       .select('*')
       .eq('organization_id', orgId)
       .eq('is_opted_out', false)
+      .not('email', 'is', null)
+      .not('tags', 'cs', '{"email-bounced"}')
       .order('quality_score', { ascending: false, nullsFirst: false })
       .order('last_name', { ascending: true }),
     supabase
@@ -58,6 +60,24 @@ export async function toggleJournalistTargetAction(
   if (!orgId) return { success: false, error: 'Unauthorized' };
 
   if (selected) {
+    // Guard: vérifier que le journaliste appartient à l'org, a un email valide et n'est pas bounced
+    const { data: journalist } = await supabase
+      .from('journalists')
+      .select('id, email, is_opted_out, tags')
+      .eq('id', journalistId)
+      .eq('organization_id', orgId)
+      .eq('is_opted_out', false)
+      .not('email', 'is', null)
+      .maybeSingle();
+
+    if (!journalist) {
+      return { success: false, error: 'Journaliste invalide ou email indisponible.' };
+    }
+    const tags: string[] = journalist.tags ?? [];
+    if (tags.includes('email-bounced')) {
+      return { success: false, error: 'Cet email a déjà généré un bounce — journaliste non sélectionnable.' };
+    }
+
     const { error } = await supabase.from('email_sends').insert({
       campaign_id: campaignId,
       press_release_id: pressReleaseId,
