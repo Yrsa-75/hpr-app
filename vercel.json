@@ -11,6 +11,10 @@
     {
       "path": "/api/cron/hunter-verifier",
       "schedule": "0 7 * * *"
+    },
+    {
+      "path": "/api/cron/batch-sender",
+      "schedule": "0 9 * * *"
     }
   ]
 }

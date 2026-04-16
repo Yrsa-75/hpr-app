@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { Send, AlertCircle, CheckCircle2, XCircle, Mail, ChevronDown, ChevronUp } from 'lucide-react';
+import { Send, AlertCircle, CheckCircle2, XCircle, Mail, ChevronDown, ChevronUp, Clock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/ui/use-toast';
 import { sendCampaignAction } from '@/app/[locale]/(dashboard)/clients/[clientId]/campaigns/[campaignId]/sending-actions';
@@ -42,8 +42,9 @@ const STATUS_CONFIG: Record<string, { label: string; color: string }> = {
 
 export function SendingTab({ campaignId, pressRelease, emailSends, client }: SendingTabProps) {
   const { toast } = useToast();
+  const BATCH_LIMIT = 100;
   const [isSending, setIsSending] = React.useState(false);
-  const [result, setResult] = React.useState<{ sent: number; failed: number } | null>(null);
+  const [result, setResult] = React.useState<{ sent: number; failed: number; remaining: number } | null>(null);
 
   const queued = emailSends.filter((s) => s.status === 'queued');
   const alreadySent = emailSends.filter((s) => s.status !== 'queued');
@@ -62,10 +63,13 @@ export function SendingTab({ campaignId, pressRelease, emailSends, client }: Sen
     try {
       const res = await sendCampaignAction(campaignId, pressRelease!.id);
       if (res.success) {
-        setResult({ sent: res.sent ?? 0, failed: res.failed ?? 0 });
+        setResult({ sent: res.sent ?? 0, failed: res.failed ?? 0, remaining: res.remaining ?? 0 });
+        const remainingMsg = (res.remaining ?? 0) > 0
+          ? ` ${res.remaining} restant${(res.remaining ?? 0) > 1 ? 's' : ''} — envoi automatique demain.`
+          : '';
         toast({
           title: 'Envoi terminé',
-          description: `${res.sent} email${(res.sent ?? 0) > 1 ? 's' : ''} envoyé${(res.sent ?? 0) > 1 ? 's' : ''}${res.failed ? `, ${res.failed} échec(s)` : ''}.${res.lastError ? ` Erreur : ${res.lastError}` : ''}`,
+          description: `${res.sent} email${(res.sent ?? 0) > 1 ? 's' : ''} envoyé${(res.sent ?? 0) > 1 ? 's' : ''}${res.failed ? `, ${res.failed} échec(s)` : ''}.${remainingMsg}${res.lastError ? ` Erreur : ${res.lastError}` : ''}`,
           variant: (res.failed ?? 0) > 0 && (res.sent ?? 0) === 0 ? 'destructive' : 'default',
         });
       } else {
@@ -78,6 +82,20 @@ export function SendingTab({ campaignId, pressRelease, emailSends, client }: Sen
 
   return (
     <div className="space-y-6 py-4">
+      {/* Batching notice */}
+      {queued.length > BATCH_LIMIT && (
+        <div className="flex items-start gap-3 rounded-xl border border-amber-500/20 bg-amber-500/5 px-4 py-3 text-xs text-amber-400">
+          <Clock className="h-4 w-4 flex-shrink-0 mt-0.5" />
+          <div>
+            <span className="font-medium">Envoi échelonné sur plusieurs jours</span>
+            <p className="mt-0.5 text-amber-400/70">
+              Votre campagne compte {queued.length} journalistes. Les {BATCH_LIMIT} premiers seront envoyés maintenant,
+              les {queued.length - BATCH_LIMIT} restants seront traités automatiquement (100 par jour à 9h).
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Checklist */}
       <div className="space-y-2">
         <h3 className="text-sm font-medium text-foreground">Vérification avant envoi</h3>
@@ -123,15 +141,25 @@ export function SendingTab({ campaignId, pressRelease, emailSends, client }: Sen
           <Send className="h-4 w-4" />
           {isSending
             ? 'Envoi en cours...'
+            : queued.length > BATCH_LIMIT
+            ? `Envoyer les ${BATCH_LIMIT} premiers (${queued.length} au total)`
             : `Envoyer à ${queued.length} journaliste${queued.length !== 1 ? 's' : ''}`}
         </Button>
         {result && (
-          <p className="text-xs text-muted-foreground">
-            <span className="text-emerald-400">{result.sent} envoyé{result.sent !== 1 ? 's' : ''}</span>
-            {result.failed > 0 && (
-              <span className="text-red-400 ml-2">{result.failed} échec{result.failed !== 1 ? 's' : ''}</span>
+          <div className="text-xs text-muted-foreground space-y-0.5">
+            <p>
+              <span className="text-emerald-400">{result.sent} envoyé{result.sent !== 1 ? 's' : ''}</span>
+              {result.failed > 0 && (
+                <span className="text-red-400 ml-2">{result.failed} échec{result.failed !== 1 ? 's' : ''}</span>
+              )}
+            </p>
+            {result.remaining > 0 && (
+              <p className="flex items-center gap-1.5 text-amber-400/80">
+                <Clock className="h-3 w-3" />
+                {result.remaining} restant{result.remaining !== 1 ? 's' : ''} — envoi automatique demain à 9h
+              </p>
             )}
-          </p>
+          </div>
         )}
       </div>
 
