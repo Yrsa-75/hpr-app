@@ -23,6 +23,13 @@ export async function sendCampaignAction(
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { success: false, error: 'Unauthorized' };
 
+  // Passer tous les envois "ciblés" en "queued" — seul ce bouton déclenche les envois
+  await supabase
+    .from('email_sends')
+    .update({ status: 'queued' })
+    .eq('campaign_id', campaignId)
+    .eq('status', 'targeted');
+
   const result = await processCampaignBatch(supabase, campaignId, DAILY_BATCH_LIMIT);
 
   if (result.sent === 0 && result.failed === 0 && !result.lastError) {

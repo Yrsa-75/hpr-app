@@ -82,20 +82,20 @@ export async function toggleJournalistTargetAction(
       campaign_id: campaignId,
       press_release_id: pressReleaseId,
       journalist_id: journalistId,
-      status: 'queued',
+      status: 'targeted',
     });
 
     if (error && error.code !== '23505') {
       return { success: false, error: error.message };
     }
   } else {
-    // Remove journalist (only if not yet sent)
+    // Remove journalist (only if not yet queued/sent — targeted = not yet triggered)
     const { error } = await supabase
       .from('email_sends')
       .delete()
       .eq('campaign_id', campaignId)
       .eq('journalist_id', journalistId)
-      .eq('status', 'queued');
+      .eq('status', 'targeted');
 
     if (error) return { success: false, error: error.message };
   }
