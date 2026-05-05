@@ -98,16 +98,27 @@ export default async function CampaignDetailPage({
     .limit(1)
     .maybeSingle();
 
-  // Fetch org journalists (for targeting) — exclut désinscrits et bounced
-  const { data: journalists } = await supabase
-    .from('journalists')
-    .select('*')
-    .eq('is_opted_out', false)
-    .not('email', 'is', null)
-    .not('tags', 'cs', '{"email-bounced"}')
-    .order('quality_score', { ascending: false, nullsFirst: false })
-    .order('last_name', { ascending: true })
-    .limit(10000);
+  // Fetch org journalists (pagination pour contourner la limite db_max_rows=1000)
+  const journalists: JournalistRow[] = [];
+  {
+    const PAGE_SIZE = 1000;
+    let from = 0;
+    while (true) {
+      const { data, error } = await supabase
+        .from('journalists')
+        .select('*')
+        .eq('is_opted_out', false)
+        .not('email', 'is', null)
+        .not('tags', 'cs', '{"email-bounced"}')
+        .order('quality_score', { ascending: false, nullsFirst: false })
+        .order('last_name', { ascending: true })
+        .range(from, from + PAGE_SIZE - 1);
+      if (error || !data || data.length === 0) break;
+      journalists.push(...(data as JournalistRow[]));
+      if (data.length < PAGE_SIZE) break;
+      from += PAGE_SIZE;
+    }
+  }
 
   // Fetch email_sends for this campaign (with journalist + press release info)
   const { data: emailSends } = await supabase
@@ -117,7 +128,7 @@ export default async function CampaignDetailPage({
     .order('sent_at', { ascending: false });
 
   const selectedJournalistIds = (emailSends ?? [])
-    .filter((s: { status: string }) => s.status === 'queued')
+    .filter((s: { status: string }) => s.status === 'targeted' || s.status === 'queued')
     .map((s: { journalist_id: string }) => s.journalist_id);
 
   // Fetch email threads with journalist info and messages (same shape as inbox)
