@@ -29,7 +29,8 @@ export async function getTargetingDataAction(campaignId: string): Promise<{
       .not('email', 'is', null)
       .not('tags', 'cs', '{"email-bounced"}')
       .order('quality_score', { ascending: false, nullsFirst: false })
-      .order('last_name', { ascending: true }),
+      .order('last_name', { ascending: true })
+      .limit(5000),
     supabase
       .from('email_sends')
       .select('journalist_id')
