@@ -68,6 +68,8 @@ export function TargetingTab({
     return true;
   });
 
+  const selectedInFiltered = filtered.filter((j) => selectedIds.has(j.id)).length;
+
   function toggleMediaType(type: string) {
     setSelectedMediaTypes((prev) => {
       const next = new Set(prev);
@@ -246,16 +248,23 @@ export function TargetingTab({
           </div>
         )}
 
-        {/* Effacer les filtres */}
-        {hasActiveFilters && (
-          <button
-            onClick={clearFilters}
-            className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
-          >
-            <X className="h-3 w-3" />
-            Effacer les filtres
-          </button>
-        )}
+        {/* Effacer les filtres + compteur */}
+        <div className="flex items-center gap-3">
+          {hasActiveFilters && (
+            <button
+              onClick={clearFilters}
+              className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+            >
+              <X className="h-3 w-3" />
+              Effacer les filtres
+            </button>
+          )}
+          <span className="text-xs font-medium text-muted-foreground">
+            <span className="text-foreground">{selectedInFiltered}</span>
+            {' / '}
+            <span className="text-foreground">{filtered.length}</span>
+          </span>
+        </div>
       </div>
 
       {/* Journalist list */}
