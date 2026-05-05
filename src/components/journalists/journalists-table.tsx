@@ -122,8 +122,8 @@ export function JournalistsTable({ journalists }: JournalistsTableProps) {
     const list = journalists.filter((j) => {
       const matchesSearch =
         !search ||
-        `${j.first_name} ${j.last_name}`.toLowerCase().includes(search.toLowerCase()) ||
-        j.email.toLowerCase().includes(search.toLowerCase()) ||
+        `${j.first_name ?? ''} ${j.last_name ?? ''}`.toLowerCase().includes(search.toLowerCase()) ||
+        (j.email ?? '').toLowerCase().includes(search.toLowerCase()) ||
         (j.media_outlet ?? '').toLowerCase().includes(search.toLowerCase());
 
       const matchesType =

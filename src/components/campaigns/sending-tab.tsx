@@ -46,15 +46,17 @@ export function SendingTab({ campaignId, pressRelease, emailSends, client }: Sen
   const [isSending, setIsSending] = React.useState(false);
   const [result, setResult] = React.useState<{ sent: number; failed: number; remaining: number } | null>(null);
 
+  const targeted = emailSends.filter((s) => s.status === 'targeted');
   const queued = emailSends.filter((s) => s.status === 'queued');
-  const alreadySent = emailSends.filter((s) => s.status !== 'queued');
+  const pendingCount = targeted.length + queued.length;
+  const alreadySent = emailSends.filter((s) => s.status !== 'queued' && s.status !== 'targeted');
 
   const canSend =
     pressRelease &&
     pressRelease.email_subject &&
     pressRelease.body_html &&
     client.sender_email &&
-    queued.length > 0;
+    pendingCount > 0;
 
   const handleSend = async () => {
     if (!canSend) return;
@@ -83,14 +85,14 @@ export function SendingTab({ campaignId, pressRelease, emailSends, client }: Sen
   return (
     <div className="space-y-6 py-4">
       {/* Batching notice */}
-      {queued.length > BATCH_LIMIT && (
+      {pendingCount > BATCH_LIMIT && (
         <div className="flex items-start gap-3 rounded-xl border border-amber-500/20 bg-amber-500/5 px-4 py-3 text-xs text-amber-400">
           <Clock className="h-4 w-4 flex-shrink-0 mt-0.5" />
           <div>
             <span className="font-medium">Envoi échelonné sur plusieurs jours</span>
             <p className="mt-0.5 text-amber-400/70">
-              Votre campagne compte {queued.length} journalistes. Les {BATCH_LIMIT} premiers seront envoyés maintenant,
-              les {queued.length - BATCH_LIMIT} restants seront traités automatiquement (100 par jour à 9h).
+              Votre campagne compte {pendingCount} journalistes. Les {BATCH_LIMIT} premiers seront envoyés maintenant,
+              les {pendingCount - BATCH_LIMIT} restants seront traités automatiquement (100 par jour à 9h).
             </p>
           </div>
         </div>
@@ -117,9 +119,9 @@ export function SendingTab({ campaignId, pressRelease, emailSends, client }: Sen
             errorDetail="Configurez l'email expéditeur dans la fiche client"
           />
           <CheckItem
-            ok={queued.length > 0}
+            ok={pendingCount > 0}
             label="Journalistes ciblés"
-            detail={queued.length > 0 ? `${queued.length} journaliste${queued.length > 1 ? 's' : ''} en attente d'envoi` : undefined}
+            detail={pendingCount > 0 ? `${pendingCount} journaliste${pendingCount > 1 ? 's' : ''} prêts à l'envoi` : undefined}
             errorDetail="Sélectionnez des journalistes dans l'onglet Ciblage"
           />
         </div>
@@ -141,9 +143,9 @@ export function SendingTab({ campaignId, pressRelease, emailSends, client }: Sen
           <Send className="h-4 w-4" />
           {isSending
             ? 'Envoi en cours...'
-            : queued.length > BATCH_LIMIT
-            ? `Envoyer les ${BATCH_LIMIT} premiers (${queued.length} au total)`
-            : `Envoyer à ${queued.length} journaliste${queued.length !== 1 ? 's' : ''}`}
+            : pendingCount > BATCH_LIMIT
+            ? `Envoyer les ${BATCH_LIMIT} premiers (${pendingCount} au total)`
+            : `Envoyer à ${pendingCount} journaliste${pendingCount !== 1 ? 's' : ''}`}
         </Button>
         {result && (
           <div className="text-xs text-muted-foreground space-y-0.5">
