@@ -11,6 +11,32 @@ async function getOrgId(supabase: Awaited<ReturnType<typeof createClient>>): Pro
   return data?.organization_id ?? null;
 }
 
+async function fetchAllJournalists(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  orgId: string
+): Promise<JournalistRow[]> {
+  const PAGE_SIZE = 1000;
+  const all: JournalistRow[] = [];
+  let from = 0;
+  while (true) {
+    const { data, error } = await supabase
+      .from('journalists')
+      .select('*')
+      .eq('organization_id', orgId)
+      .eq('is_opted_out', false)
+      .not('email', 'is', null)
+      .not('tags', 'cs', '{"email-bounced"}')
+      .order('quality_score', { ascending: false, nullsFirst: false })
+      .order('last_name', { ascending: true })
+      .range(from, from + PAGE_SIZE - 1);
+    if (error || !data || data.length === 0) break;
+    all.push(...(data as JournalistRow[]));
+    if (data.length < PAGE_SIZE) break;
+    from += PAGE_SIZE;
+  }
+  return all;
+}
+
 export async function getTargetingDataAction(campaignId: string): Promise<{
   journalists: JournalistRow[];
   selectedIds: string[];
@@ -20,17 +46,8 @@ export async function getTargetingDataAction(campaignId: string): Promise<{
   const orgId = await getOrgId(supabase);
   if (!orgId) return { journalists: [], selectedIds: [], pressReleaseId: null };
 
-  const [journalistsRes, sendsRes, prRes] = await Promise.all([
-    supabase
-      .from('journalists')
-      .select('*')
-      .eq('organization_id', orgId)
-      .eq('is_opted_out', false)
-      .not('email', 'is', null)
-      .not('tags', 'cs', '{"email-bounced"}')
-      .order('quality_score', { ascending: false, nullsFirst: false })
-      .order('last_name', { ascending: true })
-      .limit(5000),
+  const [journalists, sendsRes, prRes] = await Promise.all([
+    fetchAllJournalists(supabase, orgId),
     supabase
       .from('email_sends')
       .select('journalist_id')
@@ -44,7 +61,7 @@ export async function getTargetingDataAction(campaignId: string): Promise<{
   ]);
 
   return {
-    journalists: (journalistsRes.data ?? []) as JournalistRow[],
+    journalists,
     selectedIds: (sendsRes.data ?? []).map((r) => r.journalist_id),
     pressReleaseId: prRes.data?.id ?? null,
   };
