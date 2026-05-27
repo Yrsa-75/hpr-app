@@ -254,7 +254,7 @@ function SendHistory({ sends }: { sends: EmailSendWithJoins[] }) {
                       <div key={send.id} className="flex items-center justify-between px-4 py-2.5 bg-white/[0.01]">
                         <div className="min-w-0 flex-1">
                           <span className="text-xs text-foreground">
-                            {j ? `${j.first_name} ${j.last_name}` : send.journalist_id.slice(0, 8) + '…'}
+                            {j ? `${j.first_name} ${j.last_name}` : (send.journalist_id ?? send.prospect_id ?? '').slice(0, 8) + '…'}
                           </span>
                           {j?.media_outlet && (
                             <span className="ml-2 text-xs text-muted-foreground">{j.media_outlet}</span>
