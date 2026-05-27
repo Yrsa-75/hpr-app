@@ -240,6 +240,71 @@ export type Database = {
           },
         ];
       };
+      prospects: {
+        Row: {
+          id: string;
+          organization_id: string;
+          first_name: string;
+          last_name: string;
+          email: string | null;
+          phone: string | null;
+          company: string;
+          role: string | null;
+          sector: string | null;
+          linkedin_url: string | null;
+          notes: string | null;
+          tags: string[] | null;
+          is_verified: boolean;
+          is_opted_out: boolean;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          organization_id: string;
+          first_name: string;
+          last_name: string;
+          email?: string | null;
+          phone?: string | null;
+          company: string;
+          role?: string | null;
+          sector?: string | null;
+          linkedin_url?: string | null;
+          notes?: string | null;
+          tags?: string[] | null;
+          is_verified?: boolean;
+          is_opted_out?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          organization_id?: string;
+          first_name?: string;
+          last_name?: string;
+          email?: string | null;
+          phone?: string | null;
+          company?: string;
+          role?: string | null;
+          sector?: string | null;
+          linkedin_url?: string | null;
+          notes?: string | null;
+          tags?: string[] | null;
+          is_verified?: boolean;
+          is_opted_out?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'prospects_organization_id_fkey';
+            columns: ['organization_id'];
+            isOneToOne: false;
+            referencedRelation: 'organizations';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
       campaigns: {
         Row: {
           id: string;
@@ -248,6 +313,7 @@ export type Database = {
           name: string;
           description: string | null;
           status: 'draft' | 'preparing' | 'review' | 'approved' | 'sending' | 'active' | 'paused' | 'completed' | 'archived';
+          campaign_type: 'journalists' | 'prospects';
           tags: string[] | null;
           keywords: string[] | null;
           target_date: string | null;
@@ -271,6 +337,7 @@ export type Database = {
           name: string;
           description?: string | null;
           status?: 'draft' | 'preparing' | 'review' | 'approved' | 'sending' | 'active' | 'paused' | 'completed' | 'archived';
+          campaign_type?: 'journalists' | 'prospects';
           tags?: string[] | null;
           keywords?: string[] | null;
           target_date?: string | null;
@@ -294,6 +361,7 @@ export type Database = {
           name?: string;
           description?: string | null;
           status?: 'draft' | 'preparing' | 'review' | 'approved' | 'sending' | 'active' | 'paused' | 'completed' | 'archived';
+          campaign_type?: 'journalists' | 'prospects';
           tags?: string[] | null;
           keywords?: string[] | null;
           target_date?: string | null;
@@ -515,7 +583,8 @@ export type Database = {
           id: string;
           campaign_id: string;
           press_release_id: string;
-          journalist_id: string;
+          journalist_id: string | null;
+          prospect_id: string | null;
           resend_email_id: string | null;
           status: 'targeted' | 'queued' | 'sent' | 'delivered' | 'opened' | 'clicked' | 'bounced' | 'complained' | 'failed' | 'unsubscribed';
           sent_at: string | null;
@@ -531,7 +600,8 @@ export type Database = {
           id?: string;
           campaign_id: string;
           press_release_id: string;
-          journalist_id: string;
+          journalist_id?: string | null;
+          prospect_id?: string | null;
           resend_email_id?: string | null;
           status?: 'targeted' | 'queued' | 'sent' | 'delivered' | 'opened' | 'clicked' | 'bounced' | 'complained' | 'failed' | 'unsubscribed';
           sent_at?: string | null;
@@ -547,7 +617,8 @@ export type Database = {
           id?: string;
           campaign_id?: string;
           press_release_id?: string;
-          journalist_id?: string;
+          journalist_id?: string | null;
+          prospect_id?: string | null;
           resend_email_id?: string | null;
           status?: 'targeted' | 'queued' | 'sent' | 'delivered' | 'opened' | 'clicked' | 'bounced' | 'complained' | 'failed' | 'unsubscribed';
           sent_at?: string | null;
@@ -787,3 +858,7 @@ export type EmailMessageInsert = Database['public']['Tables']['email_messages'][
 
 export type ClientMediaAssetRow = Database['public']['Tables']['client_media_assets']['Row'];
 export type ClientMediaAssetInsert = Database['public']['Tables']['client_media_assets']['Insert'];
+
+export type ProspectRow = Database['public']['Tables']['prospects']['Row'];
+export type ProspectInsert = Database['public']['Tables']['prospects']['Insert'];
+export type ProspectUpdate = Database['public']['Tables']['prospects']['Update'];

@@ -11,7 +11,8 @@ import { TrackingTab } from '@/components/campaigns/tracking-tab';
 import { RepliesTab, type ThreadWithJoins } from '@/components/campaigns/replies-tab';
 import { ClippingsTab } from '@/components/campaigns/clippings-tab';
 import { ReportTab } from '@/components/campaigns/report-tab';
-import type { PressReleaseRow, JournalistRow, CampaignRow } from '@/types/database';
+import { ProspectTargetingTab } from '@/components/campaigns/prospect-targeting-tab';
+import type { PressReleaseRow, JournalistRow, ProspectRow, CampaignRow } from '@/types/database';
 import type { ClippingWithJoins } from '@/app/[locale]/(dashboard)/clippings/page';
 
 interface ClientInfo {
@@ -29,6 +30,8 @@ interface CampaignTabsProps {
   pressRelease: PressReleaseRow | null;
   journalists: JournalistRow[];
   selectedJournalistIds: string[];
+  prospects: ProspectRow[];
+  selectedProspectIds: string[];
   emailSends: EmailSendWithJoins[];
   threads: ThreadWithJoins[];
   clippings: ClippingWithJoins[];
@@ -58,16 +61,18 @@ export function CampaignTabs({
   pressRelease,
   journalists,
   selectedJournalistIds,
+  prospects,
+  selectedProspectIds,
   emailSends,
   threads,
   clippings,
   client,
 }: CampaignTabsProps) {
   const t = useTranslations('campaigns');
+  const isProspectCampaign = campaign.campaign_type === 'prospects';
 
-  // Local count synced from TargetingTab via callback
   const [targetCount, setTargetCount] = React.useState(
-    selectedJournalistIds.length
+    isProspectCampaign ? selectedProspectIds.length : selectedJournalistIds.length
   );
 
   return (
@@ -111,13 +116,23 @@ export function CampaignTabs({
       </TabsContent>
 
       <TabsContent value="targeting">
-        <TargetingTab
-          campaignId={campaignId}
-          journalists={journalists}
-          initialSelectedIds={selectedJournalistIds}
-          pressReleaseId={pressRelease?.id ?? null}
-          onCountChange={setTargetCount}
-        />
+        {isProspectCampaign ? (
+          <ProspectTargetingTab
+            campaignId={campaignId}
+            prospects={prospects}
+            initialSelectedIds={selectedProspectIds}
+            pressReleaseId={pressRelease?.id ?? null}
+            onCountChange={setTargetCount}
+          />
+        ) : (
+          <TargetingTab
+            campaignId={campaignId}
+            journalists={journalists}
+            initialSelectedIds={selectedJournalistIds}
+            pressReleaseId={pressRelease?.id ?? null}
+            onCountChange={setTargetCount}
+          />
+        )}
       </TabsContent>
 
       <TabsContent value="sending">

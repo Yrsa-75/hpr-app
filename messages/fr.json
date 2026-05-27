@@ -9,6 +9,7 @@
     "dashboard": "Tableau de bord",
     "clients": "Clients",
     "journalists": "Journalistes",
+    "prospects": "Prospection comm",
     "inbox": "Boîte de réception",
     "clippings": "Retombées Presse",
     "improvements": "Amélioration continue",
@@ -172,6 +173,30 @@
       "blog": "Blog",
       "influenceur": "Influenceur"
     }
+  },
+  "prospects": {
+    "title": "Prospection comm",
+    "subtitle": "Gérez vos prospects communication et marketing",
+    "addProspect": "Ajouter un prospect",
+    "importProspects": "Importer (CSV)",
+    "editProspect": "Modifier",
+    "firstName": "Prénom",
+    "lastName": "Nom",
+    "email": "Email",
+    "phone": "Téléphone",
+    "company": "Entreprise",
+    "role": "Poste",
+    "sector": "Secteur",
+    "linkedinUrl": "LinkedIn",
+    "notes": "Notes",
+    "tags": "Tags",
+    "isVerified": "Vérifié",
+    "isOptedOut": "Désinscrit",
+    "noProspects": "Aucun prospect",
+    "noProspectsDescription": "Ajoutez ou importez vos prospects pour démarrer vos campagnes de prospection.",
+    "rolePlaceholder": "ex : Directeur Communication, DG, CMO...",
+    "sectorPlaceholder": "ex : Tech, Luxe, Finance, Retail...",
+    "companyPlaceholder": "ex : LVMH, BNP Paribas..."
   },
   "inbox": {
     "title": "Boîte de réception",

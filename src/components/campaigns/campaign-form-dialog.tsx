@@ -1,13 +1,13 @@
 'use client';
 
 import * as React from 'react';
-import { useForm } from 'react-hook-form';
+import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useTranslations } from 'next-intl';
 import { useLocale } from 'next-intl';
 import { useRouter } from 'next/navigation';
-import { Loader2 } from 'lucide-react';
+import { Loader2, UserSearch, Target } from 'lucide-react';
 
 import {
   Dialog,
@@ -26,6 +26,7 @@ import { createCampaignAction } from '@/app/[locale]/(dashboard)/clients/[client
 const campaignFormSchema = z.object({
   name: z.string().min(1, 'Ce champ est obligatoire').max(200),
   description: z.string().optional(),
+  campaign_type: z.enum(['journalists', 'prospects']).default('journalists'),
   target_date: z.string().optional(),
   tags: z.string().optional(),
   keywords: z.string().optional(),
@@ -64,12 +65,14 @@ export function CampaignFormDialog({ open, onOpenChange, clientId, clientName }:
     register,
     handleSubmit,
     reset,
+    control,
     formState: { errors },
   } = useForm<CampaignFormValues>({
     resolver: zodResolver(campaignFormSchema),
     defaultValues: {
       name: '',
       description: defaultDescription(clientName),
+      campaign_type: 'journalists' as const,
       target_date: '',
       tags: '',
       keywords: '',
@@ -81,6 +84,7 @@ export function CampaignFormDialog({ open, onOpenChange, clientId, clientName }:
       reset({
         name: '',
         description: defaultDescription(clientName),
+        campaign_type: 'journalists',
         target_date: '',
         tags: '',
         keywords: '',
@@ -143,6 +147,42 @@ export function CampaignFormDialog({ open, onOpenChange, clientId, clientName }:
             {errors.name && (
               <p className="text-xs text-red-400">{errors.name.message}</p>
             )}
+          </div>
+
+          {/* Type de campagne */}
+          <div className="space-y-1.5">
+            <Label className="text-sm text-foreground/80">
+              Type de campagne <span className="text-red-400">*</span>
+            </Label>
+            <Controller
+              name="campaign_type"
+              control={control}
+              render={({ field }) => (
+                <div className="grid grid-cols-2 gap-2">
+                  {[
+                    { value: 'journalists', label: 'Journalistes', description: 'Relations presse classiques', Icon: UserSearch },
+                    { value: 'prospects', label: 'Prospects comm', description: 'Démarchage dir. comm / marketing', Icon: Target },
+                  ].map(({ value, label, description, Icon }) => (
+                    <button
+                      key={value}
+                      type="button"
+                      onClick={() => field.onChange(value)}
+                      className={`flex items-start gap-3 rounded-lg border p-3 text-left transition-colors ${
+                        field.value === value
+                          ? 'border-hpr-gold/50 bg-hpr-gold/5 text-foreground'
+                          : 'border-white/[0.08] bg-white/[0.02] text-muted-foreground hover:border-white/20 hover:text-foreground'
+                      }`}
+                    >
+                      <Icon className={`mt-0.5 h-4 w-4 shrink-0 ${field.value === value ? 'text-hpr-gold' : ''}`} />
+                      <div>
+                        <p className="text-xs font-medium">{label}</p>
+                        <p className="text-[11px] text-muted-foreground mt-0.5">{description}</p>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+            />
           </div>
 
           {/* Description */}

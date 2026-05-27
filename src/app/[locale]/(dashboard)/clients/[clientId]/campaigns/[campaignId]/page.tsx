@@ -5,7 +5,7 @@ import { ArrowLeft, Calendar, Clock } from 'lucide-react';
 import { createClient } from '@/lib/supabase/server';
 import { CampaignTabs } from '@/components/campaigns/campaign-tabs';
 import { EditCampaignButton } from '@/components/campaigns/edit-campaign-button';
-import type { CampaignRow, PressReleaseRow, JournalistRow } from '@/types/database';
+import type { CampaignRow, PressReleaseRow, JournalistRow, ProspectRow } from '@/types/database';
 import type { EmailSendWithJoins } from '@/components/campaigns/sending-tab';
 import type { ThreadWithJoins } from '@/components/campaigns/replies-tab';
 import type { ClippingWithJoins } from '@/app/[locale]/(dashboard)/clippings/page';
@@ -98,9 +98,13 @@ export default async function CampaignDetailPage({
     .limit(1)
     .maybeSingle();
 
-  // Fetch org journalists (pagination pour contourner la limite db_max_rows=1000)
+  const isProspectCampaign = campaign.campaign_type === 'prospects';
+
+  // Fetch contacts selon le type de campagne
   const journalists: JournalistRow[] = [];
-  {
+  const prospects: ProspectRow[] = [];
+
+  if (!isProspectCampaign) {
     const PAGE_SIZE = 1000;
     let from = 0;
     while (true) {
@@ -118,18 +122,46 @@ export default async function CampaignDetailPage({
       if (data.length < PAGE_SIZE) break;
       from += PAGE_SIZE;
     }
+  } else {
+    const PAGE_SIZE = 1000;
+    let from = 0;
+    while (true) {
+      const { data, error } = await supabase
+        .from('prospects')
+        .select('*')
+        .eq('is_opted_out', false)
+        .not('email', 'is', null)
+        .not('tags', 'cs', '{"email-bounced"}')
+        .order('company', { ascending: true })
+        .order('last_name', { ascending: true })
+        .range(from, from + PAGE_SIZE - 1);
+      if (error || !data || data.length === 0) break;
+      prospects.push(...(data as ProspectRow[]));
+      if (data.length < PAGE_SIZE) break;
+      from += PAGE_SIZE;
+    }
   }
 
-  // Fetch email_sends for this campaign (with journalist + press release info)
+  // Fetch email_sends for this campaign
   const { data: emailSends } = await supabase
     .from('email_sends')
     .select('*, journalists(first_name, last_name, email, media_outlet), press_releases(title)')
     .eq('campaign_id', campaignId)
     .order('sent_at', { ascending: false });
 
-  const selectedJournalistIds = (emailSends ?? [])
-    .filter((s: { status: string }) => s.status === 'targeted' || s.status === 'queued')
-    .map((s: { journalist_id: string }) => s.journalist_id);
+  const selectedJournalistIds = isProspectCampaign
+    ? []
+    : (emailSends ?? [])
+        .filter((s: { status: string }) => s.status === 'targeted' || s.status === 'queued')
+        .map((s: { journalist_id: string | null }) => s.journalist_id)
+        .filter((id): id is string => id !== null);
+
+  const selectedProspectIds = isProspectCampaign
+    ? (emailSends ?? [])
+        .filter((s: { status: string }) => s.status === 'targeted' || s.status === 'queued')
+        .map((s: { prospect_id: string | null }) => s.prospect_id)
+        .filter((id): id is string => id !== null)
+    : [];
 
   // Fetch email threads with journalist info and messages (same shape as inbox)
   const { data: rawThreads } = await supabase
@@ -238,6 +270,8 @@ export default async function CampaignDetailPage({
         pressRelease={pressRelease as PressReleaseRow | null}
         journalists={(journalists ?? []) as JournalistRow[]}
         selectedJournalistIds={selectedJournalistIds}
+        prospects={(prospects ?? []) as ProspectRow[]}
+        selectedProspectIds={selectedProspectIds}
         emailSends={(emailSends ?? []) as unknown as EmailSendWithJoins[]}
         threads={(threads ?? []) as unknown as ThreadWithJoins[]}
         clippings={(clippings ?? []) as ClippingWithJoins[]}

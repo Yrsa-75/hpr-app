@@ -8,6 +8,7 @@ import { createClient } from '@/lib/supabase/server';
 const campaignSchema = z.object({
   name: z.string().min(1, 'Ce champ est obligatoire').max(200),
   description: z.string().optional(),
+  campaign_type: z.enum(['journalists', 'prospects']).default('journalists'),
   target_date: z
     .string()
     .optional()
@@ -63,6 +64,7 @@ export async function createCampaignAction(
   const raw = {
     name: formData.get('name') as string,
     description: (formData.get('description') as string) || undefined,
+    campaign_type: ((formData.get('campaign_type') as string) || 'journalists') as 'journalists' | 'prospects',
     target_date: (formData.get('target_date') as string) || undefined,
     embargo_until: (formData.get('embargo_until') as string) || undefined,
     tags: (formData.get('tags') as string) || undefined,
@@ -93,6 +95,7 @@ export async function createCampaignAction(
       client_id: clientId,
       name: parsed.data.name,
       description: parsed.data.description ?? null,
+      campaign_type: parsed.data.campaign_type,
       target_date: parsed.data.target_date ?? null,
       embargo_until: parsed.data.embargo_until ?? null,
       tags: tagsArray,
@@ -176,7 +179,6 @@ export async function deleteCampaignAction(campaignId: string): Promise<Campaign
     return { success: false, error: 'Unauthorized' };
   }
 
-  // Get campaign to find client_id before deleting
   const { data: campaign } = await supabase
     .from('campaigns')
     .select('client_id')
