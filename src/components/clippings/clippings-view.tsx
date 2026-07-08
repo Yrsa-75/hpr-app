@@ -5,7 +5,9 @@ import { Newspaper, ExternalLink, CheckCircle, Trash2, Loader2, RefreshCw } from
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/ui/use-toast';
 import { verifyClippingAction, deleteClippingAction } from '@/app/[locale]/(dashboard)/clippings/actions';
+import { ClippingAttribution } from '@/components/clippings/clipping-attribution';
 import type { ClippingWithJoins } from '@/app/[locale]/(dashboard)/clippings/page';
+import type { ClientOption, CampaignOption } from '@/lib/clippings/attribution-options';
 
 const SENTIMENT_CONFIG = {
   positive: { label: 'Positif', color: 'text-emerald-400', bg: 'bg-emerald-500/10 border-emerald-500/20' },
@@ -21,7 +23,15 @@ function formatDate(dateStr: string | null): string {
   });
 }
 
-export function ClippingCard({ clipping }: { clipping: ClippingWithJoins }) {
+export function ClippingCard({
+  clipping,
+  clientOptions,
+  campaignOptions,
+}: {
+  clipping: ClippingWithJoins;
+  clientOptions: ClientOption[];
+  campaignOptions: CampaignOption[];
+}) {
   const { toast } = useToast();
   const [isVerifying, setIsVerifying] = React.useState(false);
   const [isDeleting, setIsDeleting] = React.useState(false);
@@ -101,19 +111,16 @@ export function ClippingCard({ clipping }: { clipping: ClippingWithJoins }) {
             <span className="font-medium">{clipping.source_name}</span>
             <span>·</span>
             <span>{formatDate(clipping.published_at)}</span>
-            {clipping.clients?.name && (
-              <>
-                <span>·</span>
-                <span>{clipping.clients.name}</span>
-              </>
-            )}
-            {clipping.campaigns?.name && (
-              <>
-                <span>·</span>
-                <span className="text-muted-foreground/60">{clipping.campaigns.name}</span>
-              </>
-            )}
           </div>
+
+          {/* Attribution client + communiqué (éditable) */}
+          <ClippingAttribution
+            clippingId={clipping.id}
+            clientId={clipping.client_id}
+            campaignId={clipping.campaign_id}
+            clientOptions={clientOptions}
+            campaignOptions={campaignOptions}
+          />
 
           {/* AI summary or excerpt */}
           {(clipping.ai_summary || clipping.excerpt) && (
@@ -163,9 +170,11 @@ export function ClippingCard({ clipping }: { clipping: ClippingWithJoins }) {
 
 interface ClippingsViewProps {
   clippings: ClippingWithJoins[];
+  clientOptions: ClientOption[];
+  campaignOptions: CampaignOption[];
 }
 
-export function ClippingsView({ clippings }: ClippingsViewProps) {
+export function ClippingsView({ clippings, clientOptions, campaignOptions }: ClippingsViewProps) {
   const [filter, setFilter] = React.useState<'all' | 'pending' | 'verified'>('all');
 
   const filtered = clippings.filter((c) => {
@@ -232,7 +241,12 @@ export function ClippingsView({ clippings }: ClippingsViewProps) {
       ) : (
         <div className="space-y-3">
           {filtered.map((clipping) => (
-            <ClippingCard key={clipping.id} clipping={clipping} />
+            <ClippingCard
+              key={clipping.id}
+              clipping={clipping}
+              clientOptions={clientOptions}
+              campaignOptions={campaignOptions}
+            />
           ))}
         </div>
       )}

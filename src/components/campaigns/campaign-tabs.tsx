@@ -14,6 +14,7 @@ import { ReportTab } from '@/components/campaigns/report-tab';
 import { ProspectTargetingTab } from '@/components/campaigns/prospect-targeting-tab';
 import type { PressReleaseRow, JournalistRow, ProspectRow, CampaignRow } from '@/types/database';
 import type { ClippingWithJoins } from '@/app/[locale]/(dashboard)/clippings/page';
+import type { ClientOption, CampaignOption } from '@/lib/clippings/attribution-options';
 
 interface ClientInfo {
   name: string;
@@ -35,6 +36,8 @@ interface CampaignTabsProps {
   emailSends: EmailSendWithJoins[];
   threads: ThreadWithJoins[];
   clippings: ClippingWithJoins[];
+  clientOptions: ClientOption[];
+  campaignOptions: CampaignOption[];
   client: ClientInfo;
 }
 
@@ -66,6 +69,8 @@ export function CampaignTabs({
   emailSends,
   threads,
   clippings,
+  clientOptions,
+  campaignOptions,
   client,
 }: CampaignTabsProps) {
   const t = useTranslations('campaigns');
@@ -153,7 +158,11 @@ export function CampaignTabs({
       </TabsContent>
 
       <TabsContent value="clippings">
-        <ClippingsTab clippings={clippings} />
+        <ClippingsTab
+          clippings={clippings}
+          clientOptions={clientOptions}
+          campaignOptions={campaignOptions}
+        />
       </TabsContent>
 
       <TabsContent value="report">

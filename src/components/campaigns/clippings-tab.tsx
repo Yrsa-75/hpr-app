@@ -5,12 +5,15 @@ import { useRouter } from 'next/navigation';
 import { Newspaper, RefreshCw } from 'lucide-react';
 import { ClippingCard } from '@/components/clippings/clippings-view';
 import type { ClippingWithJoins } from '@/app/[locale]/(dashboard)/clippings/page';
+import type { ClientOption, CampaignOption } from '@/lib/clippings/attribution-options';
 
 interface ClippingsTabProps {
   clippings: ClippingWithJoins[];
+  clientOptions: ClientOption[];
+  campaignOptions: CampaignOption[];
 }
 
-export function ClippingsTab({ clippings }: ClippingsTabProps) {
+export function ClippingsTab({ clippings, clientOptions, campaignOptions }: ClippingsTabProps) {
   const [filter, setFilter] = React.useState<'all' | 'pending' | 'verified'>('all');
   const [isRefreshing, setIsRefreshing] = React.useState(false);
   const router = useRouter();
@@ -83,7 +86,12 @@ export function ClippingsTab({ clippings }: ClippingsTabProps) {
       ) : (
         <div className="space-y-3">
           {filtered.map((clipping) => (
-            <ClippingCard key={clipping.id} clipping={clipping} />
+            <ClippingCard
+              key={clipping.id}
+              clipping={clipping}
+              clientOptions={clientOptions}
+              campaignOptions={campaignOptions}
+            />
           ))}
         </div>
       )}

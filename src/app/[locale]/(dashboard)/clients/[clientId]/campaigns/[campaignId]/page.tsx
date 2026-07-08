@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft, Calendar, Clock } from 'lucide-react';
 import { createClient } from '@/lib/supabase/server';
+import { getAttributionOptions } from '@/lib/clippings/attribution-options';
 import { CampaignTabs } from '@/components/campaigns/campaign-tabs';
 import { EditCampaignButton } from '@/components/campaigns/edit-campaign-button';
 import type { CampaignRow, PressReleaseRow, JournalistRow, ProspectRow } from '@/types/database';
@@ -178,6 +179,9 @@ export default async function CampaignDetailPage({
     .order('published_at', { ascending: false, nullsFirst: false })
     .order('created_at', { ascending: false });
 
+  // Options d'attribution (clients + communiqués) pour l'édition des retombées
+  const attributionOptions = await getAttributionOptions(supabase);
+
   const threads = (rawThreads ?? []).map((t) => ({
     ...t,
     email_messages: ((t.email_messages ?? []) as { created_at: string }[]).sort(
@@ -275,6 +279,8 @@ export default async function CampaignDetailPage({
         emailSends={(emailSends ?? []) as unknown as EmailSendWithJoins[]}
         threads={(threads ?? []) as unknown as ThreadWithJoins[]}
         clippings={(clippings ?? []) as ClippingWithJoins[]}
+        clientOptions={attributionOptions.clients}
+        campaignOptions={attributionOptions.campaigns}
         client={{
           name: clientData?.name ?? '',
           slug: clientData?.slug ?? null,

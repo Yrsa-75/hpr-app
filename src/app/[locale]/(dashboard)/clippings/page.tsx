@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { createClient } from '@/lib/supabase/server';
 import { monitorGoogleNews } from '@/lib/monitoring/google-news';
 import { ClippingsView } from '@/components/clippings/clippings-view';
+import { getAttributionOptions } from '@/lib/clippings/attribution-options';
 import type { PressClippingRow } from '@/types/database';
 
 export const metadata: Metadata = { title: 'Retombées presse — HPR' };
@@ -17,14 +18,21 @@ export default async function ClippingsPage() {
   // Run monitoring in background (non-blocking for rendering)
   monitorGoogleNews().catch(() => {});
 
-  const { data: clippings } = await supabase
-    .from('press_clippings')
-    .select('*, campaigns(name), clients(name)')
-    .order('published_at', { ascending: false, nullsFirst: false })
-    .order('created_at', { ascending: false })
-    .limit(100);
+  const [{ data: clippings }, attributionOptions] = await Promise.all([
+    supabase
+      .from('press_clippings')
+      .select('*, campaigns(name), clients(name)')
+      .order('published_at', { ascending: false, nullsFirst: false })
+      .order('created_at', { ascending: false })
+      .limit(100),
+    getAttributionOptions(supabase),
+  ]);
 
   return (
-    <ClippingsView clippings={(clippings ?? []) as ClippingWithJoins[]} />
+    <ClippingsView
+      clippings={(clippings ?? []) as ClippingWithJoins[]}
+      clientOptions={attributionOptions.clients}
+      campaignOptions={attributionOptions.campaigns}
+    />
   );
 }
