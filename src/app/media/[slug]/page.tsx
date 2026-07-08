@@ -167,11 +167,11 @@ export default async function MediaPackPage({
           )}
         </div>
 
-        {/* Footer */}
+{/* Footer */}
         <div className="border-t border-gray-200 pt-6 text-center">
           <p className="text-xs text-gray-400">
             Pack média généré via{' '}
-            <a
+            
               href="https://hermespressroom.com"
               target="_blank"
               rel="noopener noreferrer"
