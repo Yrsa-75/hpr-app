@@ -169,17 +169,6 @@ export default async function MediaPackPage({
 
 {/* Footer */}
         <div className="border-t border-gray-200 pt-6 text-center">
-          <p className="text-xs text-gray-400">
-            Pack média généré via{' '}
-            
-              href="https://hermespressroom.com"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="hover:text-gray-600 transition-colors"
-            >
-              Hermès Press Room
-            </a>
-          </p>
         </div>
       </main>
     </div>
