@@ -165,7 +165,7 @@ export default async function ImprovementsPage() {
   const lastRun = (type: TaskType) => taskRuns[type][0] ?? null;
   const nextSchedule: Record<TaskType, string> = {
     hunter_finder: 'Toutes les 4h',
-    hunter_verifier: 'Quotidien à 7h',
+    hunter_verifier: 'Quotidien à 4h (Supabase)',
     google_news: 'Quotidien à 12h',
   };
 

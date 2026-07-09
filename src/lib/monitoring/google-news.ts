@@ -137,23 +137,26 @@ export async function monitorGoogleNews(): Promise<{ found: number; inserted: nu
   let totalFound = 0;
   let totalInserted = 0;
 
+  // Cache par run : plusieurs campagnes d'un même client partagent la même requête
+  const rssCache = new Map<string, RssItem[]>();
+
   for (const campaign of campaigns) {
     const client = campaign.clients as unknown as { id: string; name: string } | null;
     if (!client) continue;
 
-    // Build search query from keywords + client name + campaign name
-    const keywords: string[] = campaign.keywords ?? [];
     const pressReleaseTitle = (campaign.press_releases as unknown as { title: string }[])?.[0]?.title ?? '';
 
-    const queryTerms = [
-      client.name,
-      ...(keywords.length > 0 ? keywords : [campaign.name]),
-    ].filter(Boolean);
-
-    const query = queryTerms.slice(0, 3).join(' ');
+    // Requête large : nom du client seul (Google News traite les espaces comme un ET,
+    // combiner client + mots-clés éliminait des retombées réelles). Le filtre de
+    // pertinence IA en aval se charge d'écarter le bruit.
+    const query = client.name.includes(' ') ? `"${client.name}"` : client.name;
     const campaignContext = pressReleaseTitle || campaign.name;
 
-    const items = await fetchGoogleNewsRss(query);
+    let items = rssCache.get(query);
+    if (!items) {
+      items = await fetchGoogleNewsRss(query);
+      rssCache.set(query, items);
+    }
     totalFound += items.length;
 
     for (const item of items) {
