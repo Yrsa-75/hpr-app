@@ -1,12 +1,20 @@
 // ============================================
-// HPR — source-discoverer Edge Function v1
+// HPR — source-discoverer Edge Function v3
 // Alimente en continu la base journalistes avec de nouvelles sources
 //
 // Deux modes :
 //   fix      — Répare les sources cassées (erreurs 404/403)
-//              Teste des patterns d'URL alternatifs + demande à Claude
+//              ET les sources "placeholder" dont team_page_url est une
+//              simple page d'accueil (elles scrapaient "avec succès" mais
+//              n'ajoutaient jamais aucun journaliste, puis étaient parquées
+//              30 jours). Teste des patterns d'URL + demande à Claude.
 //   discover — Découvre de nouvelles sources de journalistes
 //              Claude génère une liste de médias + feeds non encore connus
+//
+// v3 (brief 2026-07-09 §6f) : prise en charge des placeholders — les 53
+// sources ajoutées les 06-09/07 avaient toutes une homepage en guise de
+// team_page_url et n'étaient jamais candidates au mode fix
+// (consecutive_failures = 0).
 //
 // Cron :
 //   fix      → toutes les 6h
@@ -20,9 +28,13 @@ const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 const ANTHROPIC_API_KEY = Deno.env.get('ANTHROPIC_API_KEY')!;
 
 const CLAUDE_MODEL = 'claude-haiku-4-5-20251001';
-const FIX_BATCH = 8;       // sources à réparer par run
-const DISCOVER_BATCH = 25; // nouvelles sources à générer par run
+const FIX_BATCH = 8;        // sources en erreur à réparer par run
+const PLACEHOLDER_BATCH = 6; // sources "homepage placeholder" à réparer par run
+const DISCOVER_BATCH = 25;  // nouvelles sources à générer par run
 const FETCH_TIMEOUT_MS = 8000;
+
+// Détecte une team_page_url qui n'est qu'une page d'accueil (ex: https://site.fr/)
+const HOMEPAGE_RE = /^https?:\/\/[^/]+\/?$/;
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
   auth: { persistSession: false },
@@ -132,10 +144,13 @@ async function fixSource(source: {
   }
 
   // 2. Demander à Claude l'URL correcte
+  const problem = source.error_message
+    ? `a une URL cassée : ${source.team_page_url}\nErreur : ${source.error_message}`
+    : `n'a qu'une page d'accueil générique en guise de team_page_url : ${source.team_page_url}\nIl faut la vraie page équipe/rédaction/auteurs, ou un flux RSS.`;
+
   const prompt = `Tu es un expert des médias français et de leurs flux RSS.
 
-Le média "${source.media_name}" (domaine : ${source.media_domain}) a une URL cassée : ${source.team_page_url}
-Erreur : ${source.error_message ?? '404'}
+Le média "${source.media_name}" (domaine : ${source.media_domain}) ${problem}
 
 Réponds UNIQUEMENT avec un objet JSON valide (pas de commentaire, pas de markdown) :
 {
@@ -269,7 +284,28 @@ Deno.serve(async (req) => {
         .order('consecutive_failures', { ascending: true })
         .limit(FIX_BATCH);
 
-      for (const source of failedSources ?? []) {
+      // Sources "placeholder" : team_page_url = page d'accueil, jamais aucun
+      // journaliste ajouté. Elles scrapent "avec succès" (0 trouvé) puis sont
+      // parquées 30 jours — le mode fix doit les rattraper.
+      const { data: placeholderCandidates } = await supabase
+        .from('scraping_sources')
+        .select('id, media_name, media_domain, team_page_url, error_message, feed_url, total_journalists_added')
+        .eq('auto_disabled', false)
+        .eq('consecutive_failures', 0)
+        .is('feed_url', null)
+        .eq('total_journalists_added', 0)
+        .is('error_message', null) // exclut les placeholders déjà tentés sans succès
+        .order('created_at', { ascending: false })
+        .limit(60);
+
+      const placeholderSources = (placeholderCandidates ?? [])
+        .filter((s) => HOMEPAGE_RE.test(s.team_page_url ?? ''))
+        .slice(0, PLACEHOLDER_BATCH);
+
+      const placeholderIds = new Set(placeholderSources.map((s) => s.id));
+      const toFix = [...(failedSources ?? []), ...placeholderSources];
+
+      for (const source of toFix) {
         stats.tested++;
         try {
           const result = await fixSource(source);
@@ -291,6 +327,16 @@ Deno.serve(async (req) => {
               .eq('id', source.id);
           } else {
             console.log(`[fix] ${source.media_name} : introuvable`);
+            if (placeholderIds.has(source.id)) {
+              // Marque le placeholder comme tenté pour ne pas le retenter à chaque run
+              await supabase
+                .from('scraping_sources')
+                .update({
+                  error_message: 'fix-placeholder: page équipe/RSS introuvable',
+                  updated_at: new Date().toISOString(),
+                })
+                .eq('id', source.id);
+            }
           }
         } catch (err) {
           stats.errors++;
