@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft, Calendar, Clock } from 'lucide-react';
 import { createClient } from '@/lib/supabase/server';
+import { isJournalistSendable } from '@/lib/journalists/sendable';
 import { getAttributionOptions } from '@/lib/clippings/attribution-options';
 import { CampaignTabs } from '@/components/campaigns/campaign-tabs';
 import { EditCampaignButton } from '@/components/campaigns/edit-campaign-button';
@@ -164,6 +165,14 @@ export default async function CampaignDetailPage({
         .filter((id): id is string => id !== null)
     : [];
 
+  // Ne proposer au ciblage que les journalistes qui passeront le trigger
+  // anti-bounce (miroir de trg_block_unverified_email_sends) ; on garde
+  // ceux déjà sélectionnés pour permettre leur désélection.
+  const selectedJournalistSet = new Set(selectedJournalistIds);
+  const targetableJournalists = journalists.filter(
+    (j) => isJournalistSendable(j.tags) || selectedJournalistSet.has(j.id)
+  );
+
   // Fetch email threads with journalist info and messages (same shape as inbox)
   const { data: rawThreads } = await supabase
     .from('email_threads')
@@ -272,7 +281,7 @@ export default async function CampaignDetailPage({
         campaignId={campaignId}
         clientId={clientId}
         pressRelease={pressRelease as PressReleaseRow | null}
-        journalists={(journalists ?? []) as JournalistRow[]}
+        journalists={targetableJournalists as JournalistRow[]}
         selectedJournalistIds={selectedJournalistIds}
         prospects={(prospects ?? []) as ProspectRow[]}
         selectedProspectIds={selectedProspectIds}

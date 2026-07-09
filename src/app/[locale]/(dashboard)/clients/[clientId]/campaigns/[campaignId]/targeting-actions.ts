@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache';
 import { createClient } from '@/lib/supabase/server';
+import { isJournalistSendable, sendBlockReason } from '@/lib/journalists/sendable';
 import type { JournalistRow, ProspectRow, EmailSendRow } from '@/types/database';
 
 async function getOrgId(supabase: Awaited<ReturnType<typeof createClient>>): Promise<string | null> {
@@ -60,9 +61,16 @@ export async function getTargetingDataAction(campaignId: string): Promise<{
       .maybeSingle(),
   ]);
 
+  const selectedIds = (sendsRes.data ?? []).map((r) => r.journalist_id);
+  const selectedSet = new Set(selectedIds);
+
   return {
-    journalists,
-    selectedIds: (sendsRes.data ?? []).map((r) => r.journalist_id),
+    // Ne proposer que les journalistes qui passeront le trigger anti-bounce
+    // (on garde ceux déjà sélectionnés pour permettre leur désélection)
+    journalists: journalists.filter(
+      (j) => isJournalistSendable(j.tags) || selectedSet.has(j.id)
+    ),
+    selectedIds,
     pressReleaseId: prRes.data?.id ?? null,
   };
 }
@@ -91,9 +99,11 @@ export async function toggleJournalistTargetAction(
     if (!journalist) {
       return { success: false, error: 'Journaliste invalide ou email indisponible.' };
     }
-    const tags: string[] = journalist.tags ?? [];
-    if (tags.includes('email-bounced')) {
-      return { success: false, error: 'Cet email a déjà généré un bounce — journaliste non sélectionnable.' };
+    // Miroir du trigger trg_block_unverified_email_sends : message clair
+    // avant que l'insert ne soit rejeté par la base
+    const blockReason = sendBlockReason(journalist.tags);
+    if (blockReason) {
+      return { success: false, error: blockReason };
     }
 
     const { error } = await supabase.from('email_sends').insert({
