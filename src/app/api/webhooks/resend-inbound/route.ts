@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabase/server';
 import { analyzeJournalistReply } from '@/lib/ai/inbox';
+import { notifyJournalistReply } from '@/lib/notifications/journalist-reply-alert';
 
 interface ResendInboundEvent {
   type: string;
@@ -148,6 +149,7 @@ export async function POST(request: NextRequest) {
     });
 
     // 5. AI analysis (skip for auto-replies)
+    let sentiment: string | null = null;
     if (!auto && bodyPlain.trim()) {
       const journalistName = `${journalist.first_name} ${journalist.last_name}`;
       const analysis = await analyzeJournalistReply(
@@ -158,6 +160,7 @@ export async function POST(request: NextRequest) {
       );
 
       if (analysis) {
+        sentiment = analysis.sentiment ?? null;
         await supabase
           .from('email_threads')
           .update({
@@ -177,6 +180,32 @@ export async function POST(request: NextRequest) {
             .eq('id', emailSendId);
         }
       }
+    }
+
+    // 6. Alerte immédiate (in-app + email) — jamais pour les auto-réponses.
+    // L'heure de réaction compte : le premier arrivé gagne l'article.
+    if (!auto) {
+      const { data: campaignInfo } = await supabase
+        .from('campaigns')
+        .select('name, clients(sender_name, sender_email)')
+        .eq('id', campaignId)
+        .maybeSingle();
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const alertClient = (campaignInfo as any)?.clients as { sender_name: string | null; sender_email: string | null } | null;
+
+      await notifyJournalistReply(supabase, {
+        organizationId: journalist.organization_id,
+        campaignId,
+        threadId,
+        journalistName: `${journalist.first_name} ${journalist.last_name}`,
+        journalistMediaOutlet: journalist.media_outlet,
+        replySubject: subject,
+        replyExcerpt: bodyPlain.trim().slice(0, 400) || '(réponse sans texte)',
+        sentiment,
+        clientSenderEmail: alertClient?.sender_email ?? null,
+        clientSenderName: alertClient?.sender_name ?? null,
+        campaignName: campaignInfo?.name ?? null,
+      });
     }
 
     return NextResponse.json({ ok: true });
