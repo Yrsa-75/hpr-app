@@ -60,6 +60,7 @@ export function TargetingTab({
     if (q && !(
       j.first_name.toLowerCase().includes(q) ||
       j.last_name.toLowerCase().includes(q) ||
+      (j.email ?? '').toLowerCase().includes(q) ||
       (j.media_outlet ?? '').toLowerCase().includes(q) ||
       (j.beat ?? []).some((b) => b.toLowerCase().includes(q))
     )) return false;
@@ -315,6 +316,11 @@ export function TargetingTab({
                       <UserCheck className="h-3 w-3 text-hpr-gold flex-shrink-0" />
                     )}
                   </div>
+                  {journalist.email && (
+                    <div className="text-xs text-muted-foreground/70 mt-0.5 truncate">
+                      {journalist.email}
+                    </div>
+                  )}
                   <div className="flex items-center gap-2 mt-0.5 flex-wrap">
                     {journalist.media_outlet && (
                       <span className="text-xs text-muted-foreground">{journalist.media_outlet}</span>
