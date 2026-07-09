@@ -16,7 +16,9 @@ const BATCH_SIZE = 30;
 export async function GET(req: NextRequest) {
   const authHeader = req.headers.get('authorization');
   const secret = process.env.CRON_SECRET;
-  if (secret && authHeader !== `Bearer ${secret}`) {
+  // Fail-closed : route non planifiée (pipeline Hunter côté Supabase),
+  // ne doit jamais être déclenchable sans secret
+  if (!secret || authHeader !== `Bearer ${secret}`) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
