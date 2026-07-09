@@ -1,5 +1,5 @@
 // ============================================
-// HPR — scraper-worker Edge Function v12
+// HPR — scraper-worker Edge Function v13
 // Scraping autonome des médias français
 // Sources : HTML, RSS, Wikipedia, auteurs paginés, Twitter
 // Auto-amélioration :
@@ -8,6 +8,13 @@
 //   - Reset consecutive_failures sur succès
 //   - Cumule total_journalists_added
 //   - RSS autodiscovery si HTML retourne 404/403
+// v13 (handoff 2026-07-09 §5.3) :
+//   - organization_id explicite à la création (les journalistes créés avec
+//     null étaient invisibles dans le ciblage ; le trigger
+//     trg_default_journalist_org couvre déjà en base, ceci est le fix durable)
+//   - prompt d'extraction durci : exclut les personnes citées/interviewées
+//     dans les articles (des pilotes de motocross avaient été pris pour
+//     des journalistes)
 // ============================================
 
 import { createClient } from 'npm:@supabase/supabase-js@2';
@@ -26,6 +33,10 @@ const COST_OUTPUT_PER_M = 4.00;
 const SOURCES_PER_RUN = 3;
 const MAX_HTML_CHARS = 20_000;
 const MAX_NAME_LENGTH = 80;
+// Organisation par défaut (aligné sur le trigger trg_default_journalist_org,
+// migration 015) — les journalistes du pool global doivent y être rattachés
+// pour être visibles dans le ciblage de l'app.
+const DEFAULT_ORGANIZATION_ID = '6fb47293-2274-4c1d-95c5-cc80de757521';
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
   auth: { persistSession: false },
@@ -301,6 +312,8 @@ function buildExtractionPrompt(content: string, mediaName: string): string {
 
 RÈGLES :
 - N'inclure QUE les journalistes/rédacteurs (pas le personnel administratif, marketing, IT)
+- N'inclure QUE les personnes qui ÉCRIVENT ou produisent du contenu POUR ce média (auteurs, signatures d'articles, membres de la rédaction)
+- EXCLURE absolument les personnes seulement CITÉES, interviewées ou mentionnées DANS les articles (sportifs, pilotes, politiques, experts, dirigeants d'entreprise, témoins…) — être nommé dans un article ne fait pas de quelqu'un un journaliste
 - "beat" = tableau de thématiques couvertes, déduit du titre/rôle si possible
 - "twitter_handle" doit commencer par "@" si présent
 - "email" uniquement si explicitement présent dans le contenu
@@ -885,7 +898,7 @@ async function upsertGlobalJournalists(
         updated++;
       } else {
         const { error } = await supabase.from('journalists').insert({
-          organization_id: null,
+          organization_id: DEFAULT_ORGANIZATION_ID,
           is_global: true,
           first_name: firstName,
           last_name: lastName,
@@ -933,7 +946,7 @@ async function upsertGlobalJournalists(
         updated++;
       } else {
         const { error } = await supabase.from('journalists').insert({
-          organization_id: null,
+          organization_id: DEFAULT_ORGANIZATION_ID,
           is_global: true,
           first_name: firstName,
           last_name: lastName,
