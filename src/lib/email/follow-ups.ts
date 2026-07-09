@@ -6,6 +6,9 @@
  *   aucune réponse (pas de thread), aucune relance déjà faite.
  * - Relance 2 (J+8) : relance 1 envoyée il y a ≥ 4 jours, toujours
  *   aucune réponse. Maximum 2 relances, jamais plus.
+ * - Borne d'ancienneté : au-delà de MAX_RELANCE_AGE_DAYS, un envoi (ou une
+ *   relance 1) n'est plus relançable — évite de « relancer » des campagnes
+ *   vieilles de plusieurs mois avec un texte qui parle de quelques jours.
  *
  * Garde-fous :
  * - journaliste opt-out ou non envoyable (miroir du trigger anti-bounce) → exclu
@@ -21,6 +24,10 @@
 import { sendBlockReason } from '@/lib/journalists/sendable';
 
 const RELANCE_DELAY_DAYS = 4;
+// Borne haute : un envoi plus ancien n'est plus relançable — le template dit
+// « il y a quelques jours », faux au-delà (418 envois d'avril/mai auraient été
+// relancés sans ce garde-fou, constat du 2026-07-09).
+const MAX_RELANCE_AGE_DAYS = 21;
 const MAX_FOLLOW_UPS_PER_RUN = 50;
 
 export type FollowUpsResult = {
@@ -118,6 +125,7 @@ async function scheduleDueFollowUps(supabase: any): Promise<{ scheduled: number;
   let skipped = 0;
 
   const cutoff = daysAgoIso(RELANCE_DELAY_DAYS);
+  const maxAge = daysAgoIso(MAX_RELANCE_AGE_DAYS);
 
   // --- Relance 1 (J+4) : envois délivrés sans réponse ni relance ---
   const { data: candidateSends } = await supabase
@@ -126,6 +134,7 @@ async function scheduleDueFollowUps(supabase: any): Promise<{ scheduled: number;
     .in('status', ['delivered', 'opened', 'clicked'])
     .not('journalist_id', 'is', null)
     .lte('sent_at', cutoff)
+    .gte('sent_at', maxAge)
     .order('sent_at', { ascending: true })
     .limit(300);
 
@@ -182,6 +191,7 @@ async function scheduleDueFollowUps(supabase: any): Promise<{ scheduled: number;
     .eq('status', 'sent')
     .eq('sequence', 1)
     .lte('sent_at', cutoff)
+    .gte('sent_at', maxAge)
     .limit(300);
 
   for (const fu of sentFirstFollowUps ?? []) {
