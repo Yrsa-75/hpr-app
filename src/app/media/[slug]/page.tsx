@@ -166,10 +166,6 @@ export default async function MediaPackPage({
             </div>
           )}
         </div>
-
-{/* Footer */}
-        <div className="border-t border-gray-200 pt-6 text-center">
-        </div>
       </main>
     </div>
   );
