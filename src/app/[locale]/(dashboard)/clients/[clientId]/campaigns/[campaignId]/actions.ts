@@ -78,6 +78,7 @@ export async function updateCampaignAction(
     target_date?: string;
     tags?: string;
     keywords?: string;
+    follow_up_intro?: string;
   }
 ): Promise<{ success: boolean; error?: string }> {
   const supabase = await createClient();
@@ -99,6 +100,7 @@ export async function updateCampaignAction(
       target_date: data.target_date || null,
       tags,
       keywords,
+      follow_up_intro: data.follow_up_intro?.trim() || null,
     })
     .eq('id', campaignId);
 

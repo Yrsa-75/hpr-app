@@ -52,16 +52,24 @@ function buildFollowUpHtml(params: {
   sequence: number;
   journalistFirstName: string;
   prTitle: string;
+  campaignIntro: string | null;
   mediaPackUrl: string | null;
   signature: string;
   unsubscribeUrl: string;
 }): string {
-  const { sequence, journalistFirstName, prTitle, mediaPackUrl, signature, unsubscribeUrl } = params;
+  const { sequence, journalistFirstName, prTitle, campaignIntro, mediaPackUrl, signature, unsubscribeUrl } = params;
+
+  // Accroche personnalisée par campagne (campaigns.follow_up_intro),
+  // ex : "Le Tour roule encore jusqu'à dimanche — c'est le moment idéal
+  // pour parler de LifeStick à vos lecteurs."
+  const intro = campaignIntro?.trim()
+    ? `<p><em>${campaignIntro.trim()}</em></p>`
+    : '';
 
   const body =
     sequence === 1
       ? `<p>Bonjour ${journalistFirstName},</p>
-<p>Je me permets de revenir vers vous au sujet du communiqué « <strong>${prTitle}</strong> » que je vous ai adressé il y a quelques jours.</p>
+${intro}<p>Je me permets de revenir vers vous au sujet du communiqué « <strong>${prTitle}</strong> » que je vous ai adressé il y a quelques jours.</p>
 <p>Si le sujet retient votre attention, je peux vous proposer :</p>
 <ul>
   <li>une <strong>interview du fondateur</strong>, aux disponibilités souples ;</li>
@@ -70,7 +78,7 @@ function buildFollowUpHtml(params: {
 </ul>
 <p>Je reste à votre disposition,</p>`
       : `<p>Bonjour ${journalistFirstName},</p>
-<p>Dernière sollicitation de ma part au sujet de « <strong>${prTitle}</strong> » — je ne voudrais pas encombrer votre boîte.</p>
+${intro}<p>Dernière sollicitation de ma part au sujet de « <strong>${prTitle}</strong> » — je ne voudrais pas encombrer votre boîte.</p>
 <p>Si le sujet peut intéresser votre rédaction, même plus tard dans la saison, un simple mot suffit et je vous renvoie les éléments (interview, visuels${mediaPackUrl ? `, <a href="${mediaPackUrl}">pack média</a>` : ''}).</p>
 <p>Bien cordialement,</p>`;
 
@@ -238,7 +246,7 @@ async function processScheduledFollowUps(supabase: any): Promise<{ sent: number;
 
   const { data: dueFollowUps } = await supabase
     .from('follow_ups')
-    .select('id, campaign_id, journalist_id, email_send_id, sequence, campaigns(client_id, clients(name, slug, sender_name, sender_email, email_signature_html)), journalists(first_name, last_name, email, tags, is_opted_out)')
+    .select('id, campaign_id, journalist_id, email_send_id, sequence, campaigns(client_id, follow_up_intro, clients(name, slug, sender_name, sender_email, email_signature_html)), journalists(first_name, last_name, email, tags, is_opted_out)')
     .eq('status', 'scheduled')
     .eq('type', 'auto_scheduled')
     .lte('scheduled_at', new Date().toISOString())
@@ -305,6 +313,7 @@ async function processScheduledFollowUps(supabase: any): Promise<{ sent: number;
       sequence: fu.sequence,
       journalistFirstName: journalist.first_name,
       prTitle,
+      campaignIntro: campaign?.follow_up_intro ?? null,
       mediaPackUrl,
       signature: client?.email_signature_html ?? '',
       unsubscribeUrl,

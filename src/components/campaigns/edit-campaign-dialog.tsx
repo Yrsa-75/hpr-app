@@ -21,7 +21,11 @@ const schema = z.object({
   target_date: z.string().optional(),
   tags: z.string().optional(),
   keywords: z.string().optional(),
+  follow_up_intro: z.string().max(500, '500 caractères maximum').optional(),
 });
+
+// follow_up_intro (migration 017) n'est pas encore dans les types générés
+type CampaignWithIntro = CampaignRow & { follow_up_intro?: string | null };
 
 type FormValues = z.infer<typeof schema>;
 
@@ -44,6 +48,7 @@ export function EditCampaignDialog({ campaign, open, onOpenChange }: EditCampaig
       target_date: campaign.target_date ?? '',
       tags: (campaign.tags ?? []).join(', '),
       keywords: (campaign.keywords ?? []).join(', '),
+      follow_up_intro: (campaign as CampaignWithIntro).follow_up_intro ?? '',
     },
   });
 
@@ -55,6 +60,7 @@ export function EditCampaignDialog({ campaign, open, onOpenChange }: EditCampaig
         target_date: campaign.target_date ?? '',
         tags: (campaign.tags ?? []).join(', '),
         keywords: (campaign.keywords ?? []).join(', '),
+        follow_up_intro: (campaign as CampaignWithIntro).follow_up_intro ?? '',
       });
     }
   }, [open, campaign, reset]);
@@ -143,6 +149,23 @@ export function EditCampaignDialog({ campaign, open, onOpenChange }: EditCampaig
             />
             <p className="text-xs text-muted-foreground/60">
               Utilisés pour la surveillance automatique des retombées presse.
+            </p>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="follow_up_intro" className="text-sm text-foreground/80">
+              Accroche des relances <span className="ml-1.5 text-xs text-muted-foreground">(optionnel)</span>
+            </Label>
+            <Textarea
+              id="follow_up_intro"
+              rows={2}
+              placeholder="ex : Le Tour roule encore jusqu'à dimanche — c'est le moment idéal pour en parler à vos lecteurs."
+              {...register('follow_up_intro')}
+              className="bg-white/[0.03] border-white/[0.08] focus:border-hpr-gold/50 resize-none"
+            />
+            {errors.follow_up_intro && <p className="text-xs text-red-400">{errors.follow_up_intro.message}</p>}
+            <p className="text-xs text-muted-foreground/60">
+              Insérée en tête des relances automatiques J+4/J+8 de cette campagne. Vide = texte sobre par défaut.
             </p>
           </div>
 
