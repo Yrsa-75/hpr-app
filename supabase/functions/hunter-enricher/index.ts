@@ -1,5 +1,5 @@
 // ============================================
-// HPR — hunter-enricher Edge Function v1
+// HPR — hunter-enricher Edge Function v4
 // Enrichit en masse les journalistes sans email via Hunter.io
 // PRIORITÉ ABSOLUE : sans email valide, la plateforme ne sert à rien
 //
@@ -8,8 +8,18 @@
 //   2. Récupère un batch de journalistes sans email (pas encore tentés)
 //   3. Pour chaque : résout le domaine media_outlet → domain.tld
 //   4. Appelle Hunter email-finder API
-//   5. Si trouvé (confiance ≥ 70%) : sauvegarde + tag via-hunter
+//   5. Si trouvé (confiance ≥ 70%) : sauvegarde + tags via-hunter + validate
 //   6. Marque hunter-tried dans tous les cas (évite les boucles)
+//
+// v3 (session desktop) : auth CRON_SECRET en plus de la service role key
+// v4 (brief 2026-07-09 §6f) :
+//   - journalise CHAQUE run dans background_tasks (type 'hunter_finder'),
+//     y compris les runs à vide — directive de visibilité de Julien :
+//     aucun ajout silencieux, la page /improvements doit refléter la réalité
+//   - DOMAIN_MAP complété : afp.com, francebleu.fr + segments cibles
+//     LifeStick (vélo, moto, outdoor, santé/seniors, famille/conso, auto,
+//     B2B assurance/prévention). TechCrunch France exclu (média fermé),
+//     autojournal.net exclu (faux blog — le vrai domaine est autojournal.fr)
 //
 // Cron : toutes les 2h via pg_cron
 // Budget : s'arrête si < 50 crédits restants
@@ -31,10 +41,6 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
   auth: { persistSession: false },
 });
 
-// ============================================
-// Mapping media_outlet → domaine email
-// Construit à partir des sources connues + variantes courantes
-// ============================================
 const DOMAIN_MAP: Record<string, string> = {
   // Presse nationale
   'le monde': 'lemonde.fr',
@@ -45,16 +51,13 @@ const DOMAIN_MAP: Record<string, string> = {
   'les echos': 'lesechos.fr',
   'le parisien': 'leparisien.fr',
   "l'express": 'lexpress.fr',
-  'l\'express': 'lexpress.fr',
   'le point': 'lepoint.fr',
   "l'obs": 'nouvelobs.com',
-  'l\'obs': 'nouvelobs.com',
   'le nouvel obs': 'nouvelobs.com',
   'marianne': 'marianne.net',
   'mediapart': 'mediapart.fr',
   'la croix': 'la-croix.com',
   "l'humanité": 'humanite.fr',
-  'l\'humanité': 'humanite.fr',
   'challenges': 'challenges.fr',
   'capital': 'capital.fr',
   'le huffpost': 'huffingtonpost.fr',
@@ -64,10 +67,20 @@ const DOMAIN_MAP: Record<string, string> = {
   "l'opinion": 'lopinion.fr',
   "l'agefi": 'agefi.fr',
   '20 minutes': '20minutes.fr',
+  'the conversation': 'theconversation.com',
+  'actu.fr': 'actu.fr',
+  'arrêt sur images': 'arretsurimages.net',
+  'causeur': 'causeur.fr',
+  // Agences
+  'afp': 'afp.com',
+  'agence france-presse': 'afp.com',
+  'agence france presse': 'afp.com',
   // TV / Radio
   'france info': 'francetvinfo.fr',
   'france inter': 'radiofrance.fr',
   'france culture': 'radiofrance.fr',
+  'france bleu': 'francebleu.fr',
+  'ici (france bleu)': 'francebleu.fr',
   'rfi': 'rfi.fr',
   'rmc': 'bfmtv.com',
   'bfm tv': 'bfmtv.com',
@@ -92,6 +105,8 @@ const DOMAIN_MAP: Record<string, string> = {
   "l'adn": 'ladn.eu',
   'siècle digital': 'siecledigital.fr',
   'futura sciences': 'futura-sciences.com',
+  'futura': 'futura-sciences.com',
+  'presse-citron': 'presse-citron.net',
   // Sciences / Environnement
   'science & vie': 'science-et-vie.com',
   'sciences et avenir': 'sciencesetavenir.fr',
@@ -102,11 +117,14 @@ const DOMAIN_MAP: Record<string, string> = {
   'actu-environnement': 'actu-environnement.com',
   'novethic': 'novethic.fr',
   'socialter': 'socialter.fr',
+  'bastamag': 'basta.media',
+  'basta!': 'basta.media',
   // Culture & Lifestyle
   'les inrockuptibles': 'lesinrocks.com',
   'vogue france': 'vogue.fr',
   'télérama': 'telerama.fr',
   'telerama': 'telerama.fr',
+  'marie claire': 'marieclaire.fr',
   // Presse régionale
   'ouest-france': 'ouest-france.fr',
   'la voix du nord': 'lavoixdunord.fr',
@@ -125,6 +143,68 @@ const DOMAIN_MAP: Record<string, string> = {
   "l'équipe": 'lequipe.fr',
   'so foot': 'sofoot.com',
   'eurosport': 'eurosport.fr',
+  // Vélo (cœur de cible LifeStick pendant le Tour)
+  'weelz': 'weelz.fr',
+  'dimensions vélo': 'dimensionsvelo.com',
+  'bike café': 'bike-cafe.fr',
+  'vojo': 'vojomag.com',
+  'matos vélo': 'matos-velo.fr',
+  'citycle': 'citycle.com',
+  'le cycle': 'lecycle.fr',
+  'transition vélo': 'transitionvelo.com',
+  'vélo 101': 'velo101.com',
+  // Moto
+  'moto magazine': 'motomag.com',
+  'moto-net': 'moto-net.com',
+  'le repaire des motards': 'lerepairedesmotards.com',
+  'moto-station': 'moto-station.com',
+  'moto station': 'moto-station.com',
+  'mototribu': 'mototribu.com',
+  'motoservices': 'motoservices.com',
+  'moto revue': 'moto-revue.com',
+  'motoplanete': 'motoplanete.com',
+  'caradisiac': 'caradisiac.com',
+  'asso scooter': 'asso-scooter.org',
+  'urbaanews': 'urbaanews.com',
+  // Outdoor / rando
+  'sport et tourisme': 'sport-et-tourisme.fr',
+  'i-trekkings': 'i-trekkings.net',
+  'montagnes magazine': 'montagnes-magazine.com',
+  'outdoor experts': 'outdoorexperts.fr',
+  // Santé / seniors (SERENITY)
+  'notre temps': 'notretemps.com',
+  'pleine vie': 'pleinevie.fr',
+  'silver eco': 'silvereco.fr',
+  'senior actu': 'senioractu.com',
+  'pourquoi docteur': 'pourquoidocteur.fr',
+  'destination santé': 'destinationsante.com',
+  'santé magazine': 'santemagazine.fr',
+  'top santé': 'topsante.com',
+  'agevillage': 'agevillage.com',
+  'allodocteurs': 'allodocteurs.fr',
+  'medisite': 'medisite.fr',
+  // Famille / conso (COMPAGNON)
+  'parents': 'parents.fr',
+  'magicmaman': 'magicmaman.com',
+  'enfant.com': 'enfant.com',
+  'le journal des femmes': 'journaldesfemmes.fr',
+  'femme actuelle': 'femmeactuelle.fr',
+  '60 millions': '60millions-mag.com',
+  '60 millions de consommateurs': '60millions-mag.com',
+  'que choisir': 'quechoisir.org',
+  // Auto
+  'auto plus': 'autoplus.fr',
+  "l'auto-journal": 'autojournal.fr',
+  'auto journal': 'autojournal.fr',
+  "l'argus": 'largus.fr',
+  'turbo': 'turbo.fr',
+  'automobile magazine': 'automobile-magazine.fr',
+  'autonews': 'autonews.fr',
+  'auto infos': 'auto-infos.fr',
+  // B2B assurance / prévention (PRO)
+  "l'argus de l'assurance": 'argusdelassurance.com',
+  'face au risque': 'faceaurisque.com',
+  'prévention btp': 'preventionbtp.fr',
   // Sectoriels
   'stratégies': 'strategies.fr',
   'influencia': 'influencia.net',
@@ -134,6 +214,7 @@ const DOMAIN_MAP: Record<string, string> = {
   "l'usine nouvelle": 'usinenouvelle.com',
   'batiactu': 'batiactu.com',
   'village justice': 'village-justice.com',
+  'actu-juridique': 'actu-juridique.fr',
   'liaisons sociales': 'liaisons-sociales.fr',
   'la france agricole': 'lafranceagricole.fr',
   'le quotidien du médecin': 'lequotidiendumedecin.fr',
@@ -149,23 +230,21 @@ function resolveDomain(mediaOutlet: string): string | null {
   const key = mediaOutlet
     .toLowerCase()
     .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '') // supprime les accents pour la recherche
+    .replace(/[̀-ͯ]/g, '')
     .trim();
 
-  // 1. Correspondance exacte (avec normalisation accents)
   for (const [name, domain] of Object.entries(DOMAIN_MAP)) {
     const normName = name
       .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[̀-ͯ]/g, '')
       .toLowerCase();
     if (normName === key) return domain;
   }
 
-  // 2. Correspondance partielle
   for (const [name, domain] of Object.entries(DOMAIN_MAP)) {
     const normName = name
       .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[̀-ͯ]/g, '')
       .toLowerCase();
     if (key.includes(normName) || normName.includes(key)) return domain;
   }
@@ -173,9 +252,6 @@ function resolveDomain(mediaOutlet: string): string | null {
   return null;
 }
 
-// ============================================
-// Hunter.io API calls
-// ============================================
 async function getCreditsRemaining(): Promise<number> {
   const res = await fetch(`${HUNTER_BASE}/account?api_key=${HUNTER_API_KEY}`);
   if (!res.ok) throw new Error(`Hunter account error: ${res.status}`);
@@ -200,7 +276,6 @@ async function hunterEmailFinder(
     api_key: HUNTER_API_KEY,
   });
 
-  // domain prioritaire, sinon company (Hunter résout lui-même)
   if (domain) {
     params.set('domain', domain);
   } else {
@@ -225,9 +300,6 @@ async function hunterEmailFinder(
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-// ============================================
-// Main
-// ============================================
 const CRON_SECRET = 'hpr-cron-runner-xK9mP2026';
 
 Deno.serve(async (req) => {
@@ -240,6 +312,15 @@ Deno.serve(async (req) => {
     return new Response('Unauthorized', { status: 401 });
   }
 
+  // Trace du run dans background_tasks (lu par la page /improvements).
+  // Directive : TOUT run est journalisé, y compris à vide — aucun ajout silencieux.
+  const { data: task } = await supabase
+    .from('background_tasks')
+    .insert({ type: 'hunter_finder', status: 'running', started_at: new Date().toISOString() })
+    .select('id')
+    .single();
+  const taskId = task?.id;
+
   const stats = {
     processed: 0,
     found: 0,
@@ -249,36 +330,40 @@ Deno.serve(async (req) => {
     creditsRemaining: 0,
   };
 
+  async function closeTask(status: 'completed' | 'failed', message: string): Promise<void> {
+    if (!taskId) return;
+    await supabase.from('background_tasks').update({
+      status,
+      completed_at: new Date().toISOString(),
+      found: stats.found,
+      processed: stats.processed,
+      details: { ...stats, message },
+      error_message: status === 'failed' ? message : null,
+    }).eq('id', taskId);
+  }
+
   try {
     if (!HUNTER_API_KEY) {
+      await closeTask('failed', 'HUNTER_API_KEY non configuré');
       return new Response(
         JSON.stringify({ success: false, error: 'HUNTER_API_KEY non configuré' }),
         { status: 200, headers: { 'Content-Type': 'application/json' } }
       );
     }
 
-    // Vérification des crédits
     const credits = await getCreditsRemaining();
     stats.creditsRemaining = credits;
     console.log(`[hunter] Crédits disponibles : ${credits}`);
 
     if (credits <= CREDITS_SAFETY_FLOOR) {
+      const msg = `Crédits insuffisants : ${credits} restants (seuil : ${CREDITS_SAFETY_FLOOR})`;
+      await closeTask('completed', msg);
       return new Response(
-        JSON.stringify({
-          success: false,
-          message: `Crédits insuffisants : ${credits} restants (seuil : ${CREDITS_SAFETY_FLOOR})`,
-          stats,
-        }),
+        JSON.stringify({ success: false, message: msg, stats }),
         { status: 200, headers: { 'Content-Type': 'application/json' } }
       );
     }
 
-    // Journalistes à enrichir :
-    // - email NULL
-    // - media_outlet connu
-    // - pas encore tentés (pas de tag hunter-tried)
-    // - pas désabonnés
-    // Priorité : journalistes personnels d'abord, puis pool global
     const { data: journalists, error } = await supabase
       .from('journalists')
       .select('id, first_name, last_name, media_outlet, tags')
@@ -292,12 +377,10 @@ Deno.serve(async (req) => {
     if (error) throw error;
 
     if (!journalists || journalists.length === 0) {
+      const msg = 'Aucun journaliste à enrichir pour le moment';
+      await closeTask('completed', msg);
       return new Response(
-        JSON.stringify({
-          success: true,
-          message: 'Aucun journaliste à enrichir pour le moment',
-          stats,
-        }),
+        JSON.stringify({ success: true, message: msg, stats }),
         { status: 200, headers: { 'Content-Type': 'application/json' } }
       );
     }
@@ -305,7 +388,6 @@ Deno.serve(async (req) => {
     console.log(`[hunter] ${journalists.length} journalistes à traiter`);
 
     for (const j of journalists) {
-      // Sécurité budget : arrêt si crédits proches du plancher
       if (stats.creditsRemaining - stats.creditsUsed <= CREDITS_SAFETY_FLOOR) {
         console.log('[hunter] Seuil de sécurité atteint, arrêt du batch');
         break;
@@ -362,7 +444,6 @@ Deno.serve(async (req) => {
       } catch (err) {
         stats.errors++;
         console.error(`[hunter] Erreur ${j.first_name} ${j.last_name}: ${err}`);
-        // Marquer quand même hunter-tried pour éviter de bloquer sur cette entrée
         const newTags = [
           ...currentTags.filter((t) => t !== 'hunter-tried'),
           'hunter-tried',
@@ -378,6 +459,7 @@ Deno.serve(async (req) => {
 
     const msg = `${stats.found} emails trouvés / ${stats.processed} traités (${stats.creditsUsed} crédits consommés, ${stats.creditsRemaining} restants)`;
     console.log(`[hunter] Terminé : ${msg}`);
+    await closeTask('completed', msg);
 
     return new Response(
       JSON.stringify({ success: true, message: msg, stats }),
@@ -385,6 +467,7 @@ Deno.serve(async (req) => {
     );
   } catch (err) {
     console.error('[hunter] Erreur globale:', err);
+    await closeTask('failed', String(err));
     return new Response(
       JSON.stringify({ success: false, error: String(err), stats }),
       { status: 500, headers: { 'Content-Type': 'application/json' } }
