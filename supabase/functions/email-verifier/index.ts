@@ -1,10 +1,16 @@
 // ============================================
-// HPR — email-verifier Edge Function v1
+// HPR — email-verifier Edge Function v6
 // Vérifie les emails des journalistes via :
 //   1. DNS MX (domaine peut recevoir des emails ?)
 //   2. Catch-all detection (serveur accepte-t-il tout ?)
 //   3. SMTP RCPT TO (la boîte existe-t-elle ?)
 //   4. Hunter.io /email-verifier (optionnel, si HUNTER_API_KEY configuré)
+//
+// v4/v5 : journalisation des runs dans background_tasks (type
+// 'hunter_verifier') pour la page /improvements.
+// v6 : budget temps de 100s — le run s'arrête proprement avant les timeouts
+// (pg_cron 120s, gateway 150s, wall-clock 400s) au lieu de mourir en
+// 'running' ; les contacts non traités le seront au run suivant.
 //
 // Tags résultats :
 //   email-verified     → email confirmé valide
@@ -22,6 +28,8 @@ const HUNTER_API_KEY = Deno.env.get('HUNTER_API_KEY') ?? '';
 const BATCH_SIZE = 20;
 // Délai entre deux SMTP checks (éviter le rate limiting)
 const SMTP_DELAY_MS = 500;
+// Budget temps du run : on s'arrête proprement au-delà
+const TIME_BUDGET_MS = 100_000;
 // Nom affiché dans les logs EHLO
 const HELO_DOMAIN = 'hermespressroom.com';
 // Email expéditeur fictif pour MAIL FROM (domaine valide)
@@ -241,24 +249,35 @@ Deno.serve(async (req) => {
     });
   }
 
+  const startedAt = Date.now();
+
+  // Trace du run dans background_tasks (lu par la page /improvements)
+  const { data: task } = await supabase
+    .from('background_tasks')
+    .insert({ type: 'hunter_verifier', status: 'running', started_at: new Date().toISOString() })
+    .select('id')
+    .single();
+  const taskId = task?.id;
+
   const results = {
     processed: 0,
     verified: 0,
     invalid: 0,
     unverifiable: 0,
     unknown: 0,
+    skipped: 0,
     errors: [] as string[],
   };
 
   try {
     // Journalistes à vérifier :
-    // - ont un email réel (non null)
+    // - ont un email réel (pas noemail_)
     // - ont le tag email-pattern ou via-hunter
     // - n'ont PAS encore email-verified / non-existent / unverifiable
     const { data: journalists, error } = await supabase
       .from('journalists')
       .select('id, first_name, last_name, email, tags')
-      .not('email', 'is', null)
+      .not('email', 'like', 'noemail_%')
       .contains('tags', ['email-pattern']) // au moins ce tag
       .not('tags', 'cs', '{"email-verified"}')
       .not('tags', 'cs', '{"non-existent"}')
@@ -269,7 +288,7 @@ Deno.serve(async (req) => {
     const { data: hunterJournalists } = await supabase
       .from('journalists')
       .select('id, first_name, last_name, email, tags')
-      .not('email', 'is', null)
+      .not('email', 'like', 'noemail_%')
       .contains('tags', ['via-hunter'])
       .not('tags', 'cs', '{"email-verified"}')
       .not('tags', 'cs', '{"non-existent"}')
@@ -286,6 +305,13 @@ Deno.serve(async (req) => {
     console.log(`[verifier] ${toProcess.length} journalistes à vérifier`);
 
     for (const journalist of toProcess) {
+      // Budget temps épuisé → on s'arrête proprement, le reste attendra le prochain run
+      if (Date.now() - startedAt > TIME_BUDGET_MS) {
+        results.skipped = toProcess.length - results.processed;
+        console.log(`[verifier] budget temps épuisé, ${results.skipped} reportés au prochain run`);
+        break;
+      }
+
       const email: string = journalist.email;
       const domain = email.split('@')[1];
       const tags: string[] = journalist.tags ?? [];
@@ -340,12 +366,29 @@ Deno.serve(async (req) => {
       }
     }
 
+    if (taskId) {
+      await supabase.from('background_tasks').update({
+        status: 'completed',
+        completed_at: new Date().toISOString(),
+        found: results.verified,
+        processed: results.processed,
+        details: results,
+      }).eq('id', taskId);
+    }
+
     return new Response(JSON.stringify(results), {
       headers: { 'Content-Type': 'application/json' },
     });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     console.error('[verifier] Erreur fatale:', msg);
+    if (taskId) {
+      await supabase.from('background_tasks').update({
+        status: 'failed',
+        completed_at: new Date().toISOString(),
+        error_message: msg,
+      }).eq('id', taskId);
+    }
     return new Response(JSON.stringify({ error: msg }), {
       status: 500,
       headers: { 'Content-Type': 'application/json' },
