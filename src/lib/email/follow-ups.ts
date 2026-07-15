@@ -9,6 +9,8 @@
  * - Borne d'ancienneté : au-delà de MAX_RELANCE_AGE_DAYS, un envoi (ou une
  *   relance 1) n'est plus relançable — évite de « relancer » des campagnes
  *   vieilles de plusieurs mois avec un texte qui parle de quelques jours.
+ * - Jamais d'envoi le week-end : la planification tourne tous les jours,
+ *   mais l'envoi effectif est reporté au lundi (consigne 2026-07-15).
  *
  * Garde-fous :
  * - journaliste opt-out ou non envoyable (miroir du trigger anti-bounce) → exclu
@@ -24,6 +26,11 @@
 import { sendBlockReason } from '@/lib/journalists/sendable';
 
 const RELANCE_DELAY_DAYS = 4;
+// Marge sur le cutoff J+4 : le cron tourne à 09:00 UTC mais les envois du
+// batch précédent portent des sent_at à 09:00:48-09:01:21 — comparés à la
+// seconde près, ils rataient le run du 4e jour et glissaient au lendemain
+// (constat du 2026-07-15 sur les relances TDF/PQR).
+const CUTOFF_TOLERANCE_MIN = 15;
 // Borne haute : un envoi plus ancien n'est plus relançable — le template dit
 // « il y a quelques jours », faux au-delà (418 envois d'avril/mai auraient été
 // relancés sans ce garde-fou, constat du 2026-07-09).
@@ -50,6 +57,20 @@ interface JournalistLite {
 
 function daysAgoIso(days: number): string {
   return new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
+}
+
+// Cutoff J+4 avec marge : « il y a 4 jours moins 15 minutes »
+function relanceCutoffIso(): string {
+  const ms = (RELANCE_DELAY_DAYS * 24 * 60 - CUTOFF_TOLERANCE_MIN) * 60 * 1000;
+  return new Date(Date.now() - ms).toISOString();
+}
+
+// Les relances ne partent jamais le week-end : personne ne lit la presse
+// pro le samedi (consigne du 2026-07-15). La planification tourne, l'envoi
+// reprend au run du lundi.
+function isWeekend(): boolean {
+  const day = new Date().getUTCDay(); // cron à 09:00 UTC : jour UTC = jour Paris
+  return day === 0 || day === 6;
 }
 
 // ============================================
@@ -124,7 +145,7 @@ async function scheduleDueFollowUps(supabase: any): Promise<{ scheduled: number;
   let scheduled = 0;
   let skipped = 0;
 
-  const cutoff = daysAgoIso(RELANCE_DELAY_DAYS);
+  const cutoff = relanceCutoffIso();
   const maxAge = daysAgoIso(MAX_RELANCE_AGE_DAYS);
 
   // --- Relance 1 (J+4) : envois délivrés sans réponse ni relance ---
@@ -386,6 +407,17 @@ export async function runFollowUps(supabase: any): Promise<FollowUpsResult> {
     // Mode validation : on planifie mais on n'envoie pas.
     // Activer avec FOLLOW_UPS_AUTOSEND=true dans l'env Vercel après revue.
     return { scheduled, sent: 0, skipped: scheduleSkipped, autosend: false, errors: [] };
+  }
+
+  if (isWeekend()) {
+    // Planifié mais pas envoyé : le run du lundi reprendra la file.
+    return {
+      scheduled,
+      sent: 0,
+      skipped: scheduleSkipped,
+      autosend: true,
+      errors: ['Week-end : envoi des relances reporté au lundi'],
+    };
   }
 
   const { sent, skipped: sendSkipped, errors } = await processScheduledFollowUps(supabase);
