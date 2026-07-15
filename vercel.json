@@ -6,7 +6,7 @@
     },
     {
       "path": "/api/cron/batch-sender",
-      "schedule": "0 9 * * *"
+      "schedule": "45 11 * * *"
     }
   ]
 }
