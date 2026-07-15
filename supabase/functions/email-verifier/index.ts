@@ -1,16 +1,22 @@
 // ============================================
-// HPR — email-verifier Edge Function v6
+// HPR — email-verifier Edge Function v7
 // Vérifie les emails des journalistes via :
 //   1. DNS MX (domaine peut recevoir des emails ?)
-//   2. Catch-all detection (serveur accepte-t-il tout ?)
-//   3. SMTP RCPT TO (la boîte existe-t-elle ?)
-//   4. Hunter.io /email-verifier (optionnel, si HUNTER_API_KEY configuré)
+//   2. Hunter.io /email-verifier (voie principale si HUNTER_API_KEY)
+//   3. SMTP RCPT TO + catch-all : SECOURS uniquement, si Hunter
+//      indisponible ou inconclusive
 //
 // v4/v5 : journalisation des runs dans background_tasks (type
 // 'hunter_verifier') pour la page /improvements.
 // v6 : budget temps de 100s — le run s'arrête proprement avant les timeouts
 // (pg_cron 120s, gateway 150s, wall-clock 400s) au lieu de mourir en
 // 'running' ; les contacts non traités le seront au run suivant.
+// v7 (2026-07-15) : Hunter-first — le SMTP direct passait par le port 25,
+// bloqué en sortie de Supabase Edge : chaque adresse brûlait ~20s de
+// timeouts (catch-all + RCPT) pour finir 'unknown' et être vérifiée par
+// Hunter de toute façon. Résultat v6 : ~4 adresses par run quotidien.
+// v7 inverse l'ordre (Hunter ~1s/adresse, SMTP en secours), élargit le
+// batch et le cron passe de 1x/jour à toutes les 30 min.
 //
 // Tags résultats :
 //   email-verified     → email confirmé valide
@@ -24,10 +30,11 @@ const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 const HUNTER_API_KEY = Deno.env.get('HUNTER_API_KEY') ?? '';
 
-// Nombre de journalistes à traiter par invocation
-const BATCH_SIZE = 20;
-// Délai entre deux SMTP checks (éviter le rate limiting)
-const SMTP_DELAY_MS = 500;
+// Nombre de journalistes à traiter par invocation (par requête source ;
+// le budget temps reste le vrai plafond du run)
+const BATCH_SIZE = 60;
+// Délai entre deux vérifications (rate limit Hunter : 10 req/s)
+const VERIFY_DELAY_MS = 150;
 // Budget temps du run : on s'arrête proprement au-delà
 const TIME_BUDGET_MS = 100_000;
 // Nom affiché dans les logs EHLO
@@ -183,7 +190,7 @@ async function checkCatchAll(mxHost: string): Promise<boolean> {
 // ============================================
 async function verifyWithHunter(
   email: string
-): Promise<'valid' | 'invalid' | 'unknown'> {
+): Promise<'valid' | 'invalid' | 'catch_all' | 'unknown'> {
   if (!HUNTER_API_KEY) return 'unknown';
   try {
     const url = new URL('https://api.hunter.io/v2/email-verifier');
@@ -195,6 +202,9 @@ async function verifyWithHunter(
     const status: string = data?.data?.status ?? 'unknown';
     if (status === 'valid') return 'valid';
     if (status === 'invalid') return 'invalid';
+    // accept_all = domaine catch-all confirmé par Hunter : inutile de
+    // retenter en SMTP direct, le serveur accepte tout
+    if (status === 'accept_all') return 'catch_all';
     return 'unknown';
   } catch {
     return 'unknown';
@@ -329,22 +339,22 @@ Deno.serve(async (req) => {
           continue;
         }
 
-        // 2. SMTP RCPT TO (si Hunter pas dispo ou comme cross-check)
-        let smtpResult: 'valid' | 'invalid' | 'catch_all' | 'unknown' = 'unknown';
-        try {
-          smtpResult = await smtpVerify(email, mxHost);
-          console.log(`[verifier] SMTP ${email}: ${smtpResult}`);
-        } catch (e) {
-          console.log(`[verifier] SMTP error pour ${email}: ${e}`);
+        // 2. Hunter.io en voie principale (port 25 bloqué depuis Supabase Edge,
+        //    le SMTP direct n'aboutit presque jamais — cf. header v7)
+        let finalResult: 'valid' | 'invalid' | 'catch_all' | 'unknown' = 'unknown';
+        if (HUNTER_API_KEY) {
+          finalResult = await verifyWithHunter(email);
+          console.log(`[verifier] Hunter ${email}: ${finalResult}`);
         }
 
-        // 3. Hunter.io en renfort si SMTP inconclusive
-        let finalResult = smtpResult;
-        if ((smtpResult === 'unknown' || smtpResult === 'catch_all') && HUNTER_API_KEY) {
-          const hunterResult = await verifyWithHunter(email);
-          console.log(`[verifier] Hunter ${email}: ${hunterResult}`);
-          if (hunterResult === 'valid') finalResult = 'valid';
-          else if (hunterResult === 'invalid') finalResult = 'invalid';
+        // 3. SMTP RCPT TO en secours si Hunter indisponible ou inconclusive
+        if (finalResult === 'unknown') {
+          try {
+            finalResult = await smtpVerify(email, mxHost);
+            console.log(`[verifier] SMTP ${email}: ${finalResult}`);
+          } catch (e) {
+            console.log(`[verifier] SMTP error pour ${email}: ${e}`);
+          }
         }
 
         await applyVerificationResult(journalist.id, tags, finalResult);
@@ -356,7 +366,7 @@ Deno.serve(async (req) => {
         results.processed++;
 
         // Pause pour éviter de se faire bloquer
-        await new Promise((r) => setTimeout(r, SMTP_DELAY_MS));
+        await new Promise((r) => setTimeout(r, VERIFY_DELAY_MS));
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
         console.error(`[verifier] Erreur ${email}: ${msg}`);
