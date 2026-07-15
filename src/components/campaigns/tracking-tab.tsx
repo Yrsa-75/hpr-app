@@ -10,8 +10,22 @@ import type { EmailSendWithJoins } from '@/components/campaigns/sending-tab';
 import { deleteEmailSendsAction } from '@/app/[locale]/(dashboard)/clients/[clientId]/campaigns/[campaignId]/actions';
 import { useToast } from '@/components/ui/use-toast';
 
+export interface FollowUpLite {
+  id: string;
+  sequence: number;
+  status: 'scheduled' | 'sent' | 'cancelled';
+  scheduled_at: string | null;
+  sent_at: string | null;
+  journalists: {
+    first_name: string;
+    last_name: string;
+    media_outlet: string | null;
+  } | null;
+}
+
 interface TrackingTabProps {
   emailSends: EmailSendWithJoins[];
+  followUps: FollowUpLite[];
   campaignId: string;
 }
 
@@ -340,9 +354,103 @@ function SendGroup({ prId, sends, campaignId }: SendGroupProps) {
   );
 }
 
+// ─── Relances automatiques (J+4 / J+8) ──────────────────────────────────────
+
+const followUpStatusConfig: Record<FollowUpLite['status'], { label: string; color: string }> = {
+  scheduled: { label: 'Planifiée', color: 'text-amber-400' },
+  sent: { label: 'Envoyée', color: 'text-blue-400' },
+  cancelled: { label: 'Annulée', color: 'text-muted-foreground/60' },
+};
+
+function FollowUpsSection({ followUps }: { followUps: FollowUpLite[] }) {
+  const [isDetailOpen, setIsDetailOpen] = React.useState(false);
+
+  if (followUps.length === 0) return null;
+
+  const counts = {
+    sent: followUps.filter((f) => f.status === 'sent').length,
+    scheduled: followUps.filter((f) => f.status === 'scheduled').length,
+    cancelled: followUps.filter((f) => f.status === 'cancelled').length,
+  };
+
+  return (
+    <div className="rounded-xl border border-white/[0.08] overflow-hidden">
+      <div className="px-4 py-3 bg-white/[0.02] border-b border-white/[0.06]">
+        <p className="text-sm font-medium text-foreground">Relances automatiques</p>
+        <p className="text-xs text-muted-foreground/70 mt-0.5">
+          {counts.sent} envoyée{counts.sent > 1 ? 's' : ''}
+          {counts.scheduled > 0 && ` · ${counts.scheduled} planifiée${counts.scheduled > 1 ? 's' : ''}`}
+          {counts.cancelled > 0 && ` · ${counts.cancelled} annulée${counts.cancelled > 1 ? 's' : ''}`}
+          {' '}· les réponses arrivent dans l&apos;onglet Réponses (pas de suivi d&apos;ouverture sur les relances)
+        </p>
+      </div>
+
+      <div className="px-4 py-3">
+        <button
+          onClick={() => setIsDetailOpen((v) => !v)}
+          className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+        >
+          {isDetailOpen ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
+          {isDetailOpen ? 'Masquer le détail' : 'Voir le détail'}
+        </button>
+      </div>
+
+      {isDetailOpen && (
+        <div className="border-t border-white/[0.06]">
+          <div className="grid grid-cols-[1fr_auto_auto_auto] text-xs text-muted-foreground bg-white/[0.02] px-4 py-2 border-b border-white/[0.06] items-center gap-3">
+            <span>Journaliste</span>
+            <span className="w-20 text-center">Relance</span>
+            <span className="w-28 text-center">Envoyée le</span>
+            <span className="w-20 text-center">Statut</span>
+          </div>
+          <div className="divide-y divide-white/[0.04]">
+            {followUps.map((f) => {
+              const j = f.journalists;
+              const cfg = followUpStatusConfig[f.status] ?? followUpStatusConfig.scheduled;
+              const dt = f.sent_at ?? f.scheduled_at;
+              return (
+                <div
+                  key={f.id}
+                  className="grid grid-cols-[1fr_auto_auto_auto] items-center px-4 py-3 gap-3 bg-white/[0.01] hover:bg-white/[0.03] transition-colors"
+                >
+                  <div className="min-w-0">
+                    <p className="text-xs font-medium text-foreground truncate">
+                      {j ? `${j.first_name} ${j.last_name}` : 'Journaliste supprimé'}
+                    </p>
+                    {j?.media_outlet && (
+                      <p className="text-[13px] text-muted-foreground/70 truncate">{j.media_outlet}</p>
+                    )}
+                  </div>
+                  <div className="w-20 text-center">
+                    <span className="text-[13px] text-muted-foreground">
+                      {f.sequence === 1 ? 'nº1 (J+4)' : 'nº2 (J+8)'}
+                    </span>
+                  </div>
+                  <div className="w-28 text-center">
+                    {dt ? (
+                      <span className="text-[13px] text-muted-foreground">
+                        {new Date(dt).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' })}
+                        {' '}
+                        {new Date(dt).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
+                      </span>
+                    ) : <span className="text-muted-foreground/40">·</span>}
+                  </div>
+                  <div className="w-20 text-center">
+                    <span className={`text-[13px] font-medium ${cfg.color}`}>{cfg.label}</span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Main component ─────────────────────────────────────────────────────────
 
-export function TrackingTab({ emailSends, campaignId }: TrackingTabProps) {
+export function TrackingTab({ emailSends, followUps, campaignId }: TrackingTabProps) {
   const router = useRouter();
   const [isRefreshing, setIsRefreshing] = React.useState(false);
   const [lastRefresh, setLastRefresh] = React.useState<Date>(new Date());
@@ -419,6 +527,9 @@ export function TrackingTab({ emailSends, campaignId }: TrackingTabProps) {
       {groups.map(([prId, groupSends]) => (
         <SendGroup key={prId} prId={prId} sends={groupSends} campaignId={campaignId} />
       ))}
+
+      {/* ── Relances automatiques ── */}
+      <FollowUpsSection followUps={followUps} />
     </div>
   );
 }

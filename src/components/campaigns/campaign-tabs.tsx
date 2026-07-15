@@ -7,7 +7,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { PressReleaseEditor } from '@/components/campaigns/press-release-editor';
 import { TargetingTab } from '@/components/campaigns/targeting-tab';
 import { SendingTab, type EmailSendWithJoins } from '@/components/campaigns/sending-tab';
-import { TrackingTab } from '@/components/campaigns/tracking-tab';
+import { TrackingTab, type FollowUpLite } from '@/components/campaigns/tracking-tab';
 import { RepliesTab, type ThreadWithJoins } from '@/components/campaigns/replies-tab';
 import { ClippingsTab } from '@/components/campaigns/clippings-tab';
 import { ReportTab } from '@/components/campaigns/report-tab';
@@ -34,6 +34,7 @@ interface CampaignTabsProps {
   prospects: ProspectRow[];
   selectedProspectIds: string[];
   emailSends: EmailSendWithJoins[];
+  followUps: FollowUpLite[];
   threads: ThreadWithJoins[];
   clippings: ClippingWithJoins[];
   clientOptions: ClientOption[];
@@ -67,6 +68,7 @@ export function CampaignTabs({
   prospects,
   selectedProspectIds,
   emailSends,
+  followUps,
   threads,
   clippings,
   clientOptions,
@@ -150,7 +152,7 @@ export function CampaignTabs({
       </TabsContent>
 
       <TabsContent value="tracking">
-        <TrackingTab emailSends={emailSends} campaignId={campaignId} />
+        <TrackingTab emailSends={emailSends} followUps={followUps} campaignId={campaignId} />
       </TabsContent>
 
       <TabsContent value="replies">

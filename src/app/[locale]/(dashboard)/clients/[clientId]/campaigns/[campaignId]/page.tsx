@@ -9,6 +9,7 @@ import { CampaignTabs } from '@/components/campaigns/campaign-tabs';
 import { EditCampaignButton } from '@/components/campaigns/edit-campaign-button';
 import type { CampaignRow, PressReleaseRow, JournalistRow, ProspectRow } from '@/types/database';
 import type { EmailSendWithJoins } from '@/components/campaigns/sending-tab';
+import type { FollowUpLite } from '@/components/campaigns/tracking-tab';
 import type { ThreadWithJoins } from '@/components/campaigns/replies-tab';
 import type { ClippingWithJoins } from '@/app/[locale]/(dashboard)/clippings/page';
 import { cn } from '@/lib/utils';
@@ -180,6 +181,14 @@ export default async function CampaignDetailPage({
     .eq('campaign_id', campaignId)
     .order('updated_at', { ascending: false });
 
+  // Relances automatiques (J+4/J+8) de la campagne, pour l'onglet Suivi
+  const { data: followUps } = await supabase
+    .from('follow_ups')
+    .select('id, sequence, status, scheduled_at, sent_at, journalists(first_name, last_name, media_outlet)')
+    .eq('campaign_id', campaignId)
+    .order('sequence', { ascending: true })
+    .order('sent_at', { ascending: false, nullsFirst: true });
+
   // Fetch press clippings for this campaign
   const { data: clippings } = await supabase
     .from('press_clippings')
@@ -286,6 +295,7 @@ export default async function CampaignDetailPage({
         prospects={(prospects ?? []) as ProspectRow[]}
         selectedProspectIds={selectedProspectIds}
         emailSends={(emailSends ?? []) as unknown as EmailSendWithJoins[]}
+        followUps={(followUps ?? []) as unknown as FollowUpLite[]}
         threads={(threads ?? []) as unknown as ThreadWithJoins[]}
         clippings={(clippings ?? []) as ClippingWithJoins[]}
         clientOptions={attributionOptions.clients}
