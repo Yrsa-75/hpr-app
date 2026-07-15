@@ -35,7 +35,7 @@ Réponds UNIQUEMENT avec un objet JSON valide (sans markdown, sans backticks) :
 {
   "sentiment": "positive|neutral|negative|interested|not_interested",
   "priority_score": <0-100>,
-  "ai_suggested_response": "<réponse suggérée en 2-3 phrases professionnelles>",
+  "ai_suggested_response": "<réponse suggérée en 2-3 phrases professionnelles, sans jamais utiliser de tiret cadratin (—) ni demi-cadratin (–)>",
   "ai_response_strategy": "<stratégie recommandée en 1-2 phrases>"
 }
 

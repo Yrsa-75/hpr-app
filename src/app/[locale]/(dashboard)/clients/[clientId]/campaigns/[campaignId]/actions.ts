@@ -383,6 +383,7 @@ export async function rewriteSectionAction(
     const prompt = `Tu es un expert en relations presse. L'utilisateur veut modifier ce communiqué.
 Instruction: ${instruction}
 Contenu actuel: ${currentContent}
+N'utilise JAMAIS de tiret cadratin (—) ni demi-cadratin (–) : reformule avec deux points, virgule ou parenthèses (consigne éditoriale HPR).
 Réponds UNIQUEMENT avec le contenu réécrit, sans commentaire.`;
 
     const message = await anthropic.messages.create({

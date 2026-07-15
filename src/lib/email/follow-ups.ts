@@ -110,7 +110,7 @@ ${intro}<p>Je me permets de revenir vers vous au sujet du communiqué « <strong
 </ul>
 <p>Je reste à votre disposition,</p>`
       : `<p>Bonjour ${journalistFirstName},</p>
-${intro}<p>Dernière sollicitation de ma part au sujet de « <strong>${prTitle}</strong> » — je ne voudrais pas encombrer votre boîte.</p>
+${intro}<p>N'hésitez pas à me demander plus d'informations.</p>
 <p>Si le sujet peut intéresser votre rédaction, même plus tard dans la saison, un simple mot suffit et je vous renvoie les éléments (interview, visuels${mediaPackUrl ? `, <a href="${mediaPackUrl}">pack média</a>` : ''}).</p>
 <p>Bien cordialement,</p>`;
 
