@@ -35,7 +35,11 @@ const CUTOFF_TOLERANCE_MIN = 15;
 // « il y a quelques jours », faux au-delà (418 envois d'avril/mai auraient été
 // relancés sans ce garde-fou, constat du 2026-07-09).
 const MAX_RELANCE_AGE_DAYS = 21;
-const MAX_FOLLOW_UPS_PER_RUN = 50;
+// 50 → 100 le 2026-07-15 : regroupement du calendrier (88 relances 2 TDF+PQR
+// doivent partir en un seul run le 16/07). Le quota Resend ~100/jour reste la
+// borne réelle ; SEND_DELAY_MS lisse le débit pour éviter les 429 en rafale.
+const MAX_FOLLOW_UPS_PER_RUN = 100;
+const SEND_DELAY_MS = 600;
 
 export type FollowUpsResult = {
   scheduled: number;
@@ -389,6 +393,10 @@ async function processScheduledFollowUps(supabase: any): Promise<{ sent: number;
       errors.push(`Exception (follow_up ${fu.id}): ${msg}`);
       skipped++;
     }
+
+    // Lisse le débit : l'API Resend limite à ~2 req/s, un batch de 100 en
+    // rafale déclencherait des 429 (et le report au lendemain).
+    await new Promise((r) => setTimeout(r, SEND_DELAY_MS));
   }
 
   return { sent, skipped, errors };
