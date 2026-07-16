@@ -382,6 +382,10 @@ async function processScheduledFollowUps(supabase: any): Promise<{ sent: number;
           status: 'sent',
           sent_at: new Date().toISOString(),
           content_html: html,
+          // Sans cet ID, le webhook Resend ne peut pas raccrocher les
+          // événements delivered/opened/clicked (constat du 2026-07-16).
+          resend_email_id: result.data?.id ?? null,
+          delivery_status: 'sent',
         }).eq('id', fu.id);
       }
     } catch (err) {
@@ -400,6 +404,129 @@ async function processScheduledFollowUps(supabase: any): Promise<{ sent: number;
   }
 
   return { sent, skipped, errors };
+}
+
+// ============================================
+// Backfill : raccrocher les relances orphelines à leur email Resend
+// ============================================
+// Les relances envoyées avant le 2026-07-16 n'ont pas de resend_email_id :
+// on relit l'historique Resend (emails.list) et on re-matche chaque relance
+// par l'UUID de l'envoi d'origine présent dans le reply_to
+// (reply+<email_send_id>@…) + la proximité de la date d'envoi (l'envoi
+// initial partage le même reply_to mais date d'un autre jour). No-op dès
+// qu'il n'y a plus d'orpheline. Limite : la rétention des logs Resend ;
+// au-delà, l'événement est perdu et la relance reste 'sent'.
+
+export type FollowUpBackfillResult = {
+  orphans: number;
+  matched: number;
+  updated: number;
+  pages: number;
+  errors: string[];
+};
+
+// Resend renvoie parfois des timestamps façon Postgres ("2026-07-15 12:10:41.307+00")
+function parseResendTs(s: string): number {
+  let t = Date.parse(s);
+  if (Number.isNaN(t)) t = Date.parse(s.replace(' ', 'T').replace(/\+00$/, 'Z'));
+  return t;
+}
+
+const BACKFILL_MATCH_TOLERANCE_MS = 30 * 60 * 1000;
+const BACKFILL_MAX_PAGES = 30;
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export async function backfillFollowUpTracking(supabase: any): Promise<FollowUpBackfillResult> {
+  const errors: string[] = [];
+
+  const { data: orphans } = await supabase
+    .from('follow_ups')
+    .select('id, email_send_id, sent_at')
+    .eq('status', 'sent')
+    .is('resend_email_id', null)
+    .not('sent_at', 'is', null);
+
+  if (!orphans || orphans.length === 0) {
+    return { orphans: 0, matched: 0, updated: 0, pages: 0, errors };
+  }
+
+  const apiKey = process.env.RESEND_API_KEY?.trim();
+  if (!apiKey) {
+    return { orphans: orphans.length, matched: 0, updated: 0, pages: 0, errors: ['Clé API Resend non configurée'] };
+  }
+
+  const { Resend } = await import('resend');
+  const resend = new Resend(apiKey);
+
+  const oldestOrphanMs = Math.min(
+    ...orphans.map((o: { sent_at: string }) => new Date(o.sent_at).getTime())
+  );
+
+  // On remonte le journal Resend (du plus récent au plus ancien) jusqu'à
+  // dépasser la plus vieille relance orpheline.
+  type ListedEmail = {
+    id: string;
+    reply_to: string[] | null;
+    created_at: string;
+    last_event: string;
+  };
+  const emails: ListedEmail[] = [];
+  let after: string | undefined;
+  let pages = 0;
+
+  while (pages < BACKFILL_MAX_PAGES) {
+    const res = await resend.emails.list(after ? { limit: 100, after } : { limit: 100 });
+    if (res.error) {
+      errors.push(`Resend list error: ${JSON.stringify(res.error)}`);
+      break;
+    }
+    const batch = (res.data?.data ?? []) as ListedEmail[];
+    emails.push(...batch);
+    pages++;
+    if (batch.length === 0 || !res.data?.has_more) break;
+    const oldestInBatch = parseResendTs(batch[batch.length - 1].created_at);
+    if (oldestInBatch < oldestOrphanMs - 60 * 60 * 1000) break;
+    after = batch[batch.length - 1].id;
+    // Rate limit Resend ~2 req/s
+    await new Promise((r) => setTimeout(r, 600));
+  }
+
+  const eventToDelivery: Record<string, string> = {
+    delivered: 'delivered',
+    opened: 'opened',
+    clicked: 'clicked',
+    bounced: 'bounced',
+    complained: 'complained',
+  };
+
+  let matched = 0;
+  let updated = 0;
+
+  for (const fu of orphans) {
+    const sentMs = new Date(fu.sent_at).getTime();
+    const candidate = emails.find(
+      (e) =>
+        e.reply_to?.some((r) => r.includes(fu.email_send_id)) &&
+        Math.abs(parseResendTs(e.created_at) - sentMs) < BACKFILL_MATCH_TOLERANCE_MS
+    );
+    if (!candidate) continue;
+    matched++;
+
+    const delivery = eventToDelivery[candidate.last_event] ?? 'sent';
+    const updates: Record<string, unknown> = {
+      resend_email_id: candidate.id,
+      delivery_status: delivery,
+    };
+    // Le journal ne donne que le dernier événement, pas ses horodatages :
+    // opened_at/clicked_at restent null pour ces relances rattrapées.
+    if (delivery === 'bounced') updates.bounced_at = fu.sent_at;
+
+    const { error } = await supabase.from('follow_ups').update(updates).eq('id', fu.id);
+    if (error) errors.push(`Update follow_up ${fu.id}: ${error.message}`);
+    else updated++;
+  }
+
+  return { orphans: orphans.length, matched, updated, pages, errors };
 }
 
 // ============================================

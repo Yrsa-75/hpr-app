@@ -14,8 +14,11 @@ export interface FollowUpLite {
   id: string;
   sequence: number;
   status: 'scheduled' | 'sent' | 'cancelled';
+  delivery_status: 'sent' | 'delivered' | 'opened' | 'clicked' | 'bounced' | 'complained' | null;
   scheduled_at: string | null;
   sent_at: string | null;
+  opened_at: string | null;
+  clicked_at: string | null;
   journalists: {
     first_name: string;
     last_name: string;
@@ -362,13 +365,29 @@ const followUpStatusConfig: Record<FollowUpLite['status'], { label: string; colo
   cancelled: { label: 'Annulée', color: 'text-muted-foreground/60' },
 };
 
+// Suivi Resend d'une relance envoyée (delivery_status)
+const followUpDeliveryConfig: Record<string, { label: string; color: string }> = {
+  sent: { label: 'Envoyée', color: 'text-blue-400' },
+  delivered: { label: 'Délivrée', color: 'text-blue-400' },
+  opened: { label: 'Ouverte', color: 'text-emerald-400' },
+  clicked: { label: 'Cliquée', color: 'text-hpr-gold' },
+  bounced: { label: 'Rejetée', color: 'text-red-400' },
+  complained: { label: 'Spam', color: 'text-red-400' },
+};
+
 function FollowUpsSection({ followUps }: { followUps: FollowUpLite[] }) {
   const [isDetailOpen, setIsDetailOpen] = React.useState(false);
 
   if (followUps.length === 0) return null;
 
+  const isOpened = (f: FollowUpLite) =>
+    f.delivery_status === 'opened' || f.delivery_status === 'clicked';
+
   const counts = {
     sent: followUps.filter((f) => f.status === 'sent').length,
+    opened: followUps.filter((f) => f.status === 'sent' && isOpened(f)).length,
+    clicked: followUps.filter((f) => f.status === 'sent' && f.delivery_status === 'clicked').length,
+    bounced: followUps.filter((f) => f.status === 'sent' && f.delivery_status === 'bounced').length,
     scheduled: followUps.filter((f) => f.status === 'scheduled').length,
     cancelled: followUps.filter((f) => f.status === 'cancelled').length,
   };
@@ -379,9 +398,12 @@ function FollowUpsSection({ followUps }: { followUps: FollowUpLite[] }) {
         <p className="text-sm font-medium text-foreground">Relances automatiques</p>
         <p className="text-xs text-muted-foreground/70 mt-0.5">
           {counts.sent} envoyée{counts.sent > 1 ? 's' : ''}
+          {counts.opened > 0 && <span className="text-emerald-400"> · {counts.opened} ouverte{counts.opened > 1 ? 's' : ''}</span>}
+          {counts.clicked > 0 && <span className="text-hpr-gold"> · {counts.clicked} cliquée{counts.clicked > 1 ? 's' : ''}</span>}
+          {counts.bounced > 0 && <span className="text-red-400"> · {counts.bounced} rejetée{counts.bounced > 1 ? 's' : ''}</span>}
           {counts.scheduled > 0 && ` · ${counts.scheduled} planifiée${counts.scheduled > 1 ? 's' : ''}`}
           {counts.cancelled > 0 && ` · ${counts.cancelled} annulée${counts.cancelled > 1 ? 's' : ''}`}
-          {' '}· les réponses arrivent dans l&apos;onglet Réponses (pas de suivi d&apos;ouverture sur les relances)
+          {' '}· les réponses arrivent dans l&apos;onglet Réponses
         </p>
       </div>
 
@@ -397,21 +419,26 @@ function FollowUpsSection({ followUps }: { followUps: FollowUpLite[] }) {
 
       {isDetailOpen && (
         <div className="border-t border-white/[0.06]">
-          <div className="grid grid-cols-[1fr_auto_auto_auto] text-xs text-muted-foreground bg-white/[0.02] px-4 py-2 border-b border-white/[0.06] items-center gap-3">
+          <div className="grid grid-cols-[1fr_auto_auto_auto_auto] text-xs text-muted-foreground bg-white/[0.02] px-4 py-2 border-b border-white/[0.06] items-center gap-3">
             <span>Journaliste</span>
             <span className="w-20 text-center">Relance</span>
             <span className="w-28 text-center">Envoyée le</span>
+            <span className="w-28 text-center">Ouverture</span>
             <span className="w-20 text-center">Statut</span>
           </div>
           <div className="divide-y divide-white/[0.04]">
             {followUps.map((f) => {
               const j = f.journalists;
-              const cfg = followUpStatusConfig[f.status] ?? followUpStatusConfig.scheduled;
+              const cfg =
+                f.status === 'sent'
+                  ? followUpDeliveryConfig[f.delivery_status ?? 'sent'] ?? followUpDeliveryConfig.sent
+                  : followUpStatusConfig[f.status] ?? followUpStatusConfig.scheduled;
               const dt = f.sent_at ?? f.scheduled_at;
+              const openedDt = f.opened_at ?? f.clicked_at;
               return (
                 <div
                   key={f.id}
-                  className="grid grid-cols-[1fr_auto_auto_auto] items-center px-4 py-3 gap-3 bg-white/[0.01] hover:bg-white/[0.03] transition-colors"
+                  className="grid grid-cols-[1fr_auto_auto_auto_auto] items-center px-4 py-3 gap-3 bg-white/[0.01] hover:bg-white/[0.03] transition-colors"
                 >
                   <div className="min-w-0">
                     <p className="text-xs font-medium text-foreground truncate">
@@ -434,6 +461,26 @@ function FollowUpsSection({ followUps }: { followUps: FollowUpLite[] }) {
                         {new Date(dt).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
                       </span>
                     ) : <span className="text-muted-foreground/40">·</span>}
+                  </div>
+                  <div className="w-28 text-center">
+                    {openedDt ? (
+                      <span className={`text-[13px] flex items-center justify-center gap-1 ${f.clicked_at ? 'text-hpr-gold' : 'text-emerald-400'}`}>
+                        <Eye className="h-3 w-3" />
+                        {new Date(openedDt).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' })}
+                        {' '}
+                        {new Date(openedDt).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
+                      </span>
+                    ) : isOpened(f) ? (
+                      // Relance rattrapée depuis le journal Resend : on sait
+                      // qu'elle a été ouverte, mais pas quand.
+                      <span className="text-[13px] text-emerald-400/70 flex items-center justify-center gap-1">
+                        <Eye className="h-3 w-3" />oui
+                      </span>
+                    ) : (
+                      <span className="text-[13px] text-muted-foreground/40 flex items-center justify-center gap-1">
+                        <Clock className="h-3 w-3" />—
+                      </span>
+                    )}
                   </div>
                   <div className="w-20 text-center">
                     <span className={`text-[13px] font-medium ${cfg.color}`}>{cfg.label}</span>

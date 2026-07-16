@@ -184,7 +184,7 @@ export default async function CampaignDetailPage({
   // Relances automatiques (J+4/J+8) de la campagne, pour l'onglet Suivi
   const { data: followUps } = await supabase
     .from('follow_ups')
-    .select('id, sequence, status, scheduled_at, sent_at, journalists(first_name, last_name, media_outlet)')
+    .select('id, sequence, status, delivery_status, scheduled_at, sent_at, opened_at, clicked_at, journalists(first_name, last_name, media_outlet)')
     .eq('campaign_id', campaignId)
     .order('sequence', { ascending: true })
     .order('sent_at', { ascending: false, nullsFirst: true });

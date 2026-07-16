@@ -10,7 +10,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabase/server';
 import { processCampaignBatch, DAILY_BATCH_LIMIT } from '@/lib/email/send-batch';
-import { runFollowUps } from '@/lib/email/follow-ups';
+import { runFollowUps, backfillFollowUpTracking } from '@/lib/email/follow-ups';
 
 export const runtime = 'nodejs';
 export const maxDuration = 300;
@@ -66,10 +66,23 @@ export async function GET(req: NextRequest) {
     console.error('[batch-sender] Erreurs relances:', followUps.errors);
   }
 
+  // Rattrapage : relances envoyées sans resend_email_id (avant 2026-07-16),
+  // re-matchées depuis le journal Resend. No-op quand il n'y a plus d'orpheline.
+  const backfill = await backfillFollowUpTracking(supabase);
+  if (backfill.orphans > 0) {
+    console.log(
+      `[batch-sender] Backfill tracking relances: orphelines=${backfill.orphans}, matchées=${backfill.matched}, mises à jour=${backfill.updated}, pages Resend=${backfill.pages}`
+    );
+    if (backfill.errors.length > 0) {
+      console.error('[batch-sender] Erreurs backfill relances:', backfill.errors);
+    }
+  }
+
   return NextResponse.json({
     message: `Batch terminé : ${totalSent} email${totalSent !== 1 ? 's' : ''} envoyé${totalSent !== 1 ? 's' : ''}, ${followUps.scheduled} relance${followUps.scheduled !== 1 ? 's' : ''} planifiée${followUps.scheduled !== 1 ? 's' : ''}, ${followUps.sent} envoyée${followUps.sent !== 1 ? 's' : ''}`,
     campaigns: campaignIds.length,
     results,
     followUps,
+    backfill,
   });
 }

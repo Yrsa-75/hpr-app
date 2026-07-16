@@ -98,6 +98,19 @@ async function handleEvent(body: ResendWebhookEvent) {
       return NextResponse.json({ ok: true });
   }
 
+  // L'ID Resend appartient soit à un envoi initial (email_sends), soit à une
+  // relance (follow_ups) : les relances portent leur propre resend_email_id
+  // depuis le 2026-07-16.
+  const { data: sendRow } = await supabase
+    .from('email_sends')
+    .select('id')
+    .eq('resend_email_id', emailId)
+    .maybeSingle();
+
+  if (!sendRow) {
+    return await handleFollowUpEvent(supabase, emailId, body.type, updates, now);
+  }
+
   // For clicked events, only set opened_at if not already set,
   // and never overwrite an 'unsubscribed' status (unsubscribe link click)
   if (body.type === 'email.clicked' && updates.opened_at) {
@@ -190,6 +203,96 @@ async function handleEvent(body: ResendWebhookEvent) {
           })
           .eq('id', send.journalist_id);
       }
+    }
+  }
+
+  return NextResponse.json({ ok: true });
+}
+
+// ============================================
+// Événements sur une relance (follow_ups)
+// ============================================
+// Les relances ont leur propre cycle de suivi dans delivery_status ; les
+// événements peuvent arriver dans le désordre, on n'écrase jamais un statut
+// plus avancé (clicked > opened > delivered > sent). bounced/complained
+// gagnent toujours et déclenchent les mêmes effets de bord côté journaliste
+// que pour un envoi initial.
+const DELIVERY_RANK: Record<string, number> = { sent: 0, delivered: 1, opened: 2, clicked: 3 };
+
+async function handleFollowUpEvent(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  supabase: any,
+  emailId: string,
+  eventType: string,
+  updates: Record<string, unknown>,
+  now: string
+) {
+  const { data: fu } = await supabase
+    .from('follow_ups')
+    .select('id, journalist_id, delivery_status, opened_at')
+    .eq('resend_email_id', emailId)
+    .maybeSingle();
+
+  if (!fu) {
+    // Ni envoi initial ni relance connue : on ignore silencieusement.
+    return NextResponse.json({ ok: true });
+  }
+
+  const newStatus = updates.status as string;
+  const fuUpdates: Record<string, unknown> = {};
+
+  if (newStatus === 'bounced' || newStatus === 'complained') {
+    fuUpdates.delivery_status = newStatus;
+    if (newStatus === 'bounced') fuUpdates.bounced_at = now;
+  } else {
+    const current = (fu.delivery_status as string) ?? 'sent';
+    if ((DELIVERY_RANK[newStatus] ?? 0) > (DELIVERY_RANK[current] ?? 0)) {
+      fuUpdates.delivery_status = newStatus;
+    }
+    if (eventType === 'email.opened' && !fu.opened_at) fuUpdates.opened_at = now;
+    if (eventType === 'email.clicked') {
+      fuUpdates.clicked_at = now;
+      if (!fu.opened_at) fuUpdates.opened_at = now; // pixel peut-être bloqué
+    }
+  }
+
+  if (Object.keys(fuUpdates).length > 0) {
+    await supabase.from('follow_ups').update(fuUpdates).eq('id', fu.id);
+  }
+
+  // Effets de bord journaliste, identiques aux envois initiaux
+  if (eventType === 'email.complained' && fu.journalist_id) {
+    const { data: journalist } = await supabase
+      .from('journalists')
+      .select('tags')
+      .eq('id', fu.journalist_id)
+      .single();
+    if (journalist) {
+      const currentTags: string[] = journalist.tags ?? [];
+      const newTags = [...new Set([...currentTags, 'opted-out'])];
+      await supabase
+        .from('journalists')
+        .update({ is_opted_out: true, tags: newTags, updated_at: now })
+        .eq('id', fu.journalist_id);
+    }
+  }
+
+  if (eventType === 'email.bounced' && fu.journalist_id) {
+    const { data: journalist } = await supabase
+      .from('journalists')
+      .select('tags')
+      .eq('id', fu.journalist_id)
+      .single();
+    if (journalist) {
+      const currentTags: string[] = journalist.tags ?? [];
+      const newTags = [
+        ...currentTags.filter((t) => t !== 'validate' && t !== 'email-bounced' && t !== 'hunter-tried'),
+        'email-bounced',
+      ];
+      await supabase
+        .from('journalists')
+        .update({ email: null, tags: newTags, updated_at: now })
+        .eq('id', fu.journalist_id);
     }
   }
 
