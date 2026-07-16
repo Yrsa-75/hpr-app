@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { ArrowLeft, Calendar, Clock } from 'lucide-react';
 import { createClient } from '@/lib/supabase/server';
 import { isJournalistSendable } from '@/lib/journalists/sendable';
+import { maybeBackfillFollowUpTracking } from '@/lib/email/follow-ups';
 import { getAttributionOptions } from '@/lib/clippings/attribution-options';
 import { CampaignTabs } from '@/components/campaigns/campaign-tabs';
 import { EditCampaignButton } from '@/components/campaigns/edit-campaign-button';
@@ -13,6 +14,10 @@ import type { FollowUpLite } from '@/components/campaigns/tracking-tab';
 import type { ThreadWithJoins } from '@/components/campaigns/replies-tab';
 import type { ClippingWithJoins } from '@/app/[locale]/(dashboard)/clippings/page';
 import { cn } from '@/lib/utils';
+
+// Le rattrapage du tracking des relances peut prendre ~10-20 s au premier
+// chargement (défaut Hobby : 10 s, insuffisant)
+export const maxDuration = 60;
 
 type CampaignStatus = CampaignRow['status'];
 
@@ -180,6 +185,11 @@ export default async function CampaignDetailPage({
     .select('*, journalists(first_name, last_name, email, media_outlet), campaigns(id, name, clients(name)), email_messages(*)')
     .eq('campaign_id', campaignId)
     .order('updated_at', { ascending: false });
+
+  // Rattrapage one-shot du tracking Resend des relances envoyées avant le
+  // 2026-07-16 (aucun resend_email_id stocké à l'époque). Quick-exit dès
+  // qu'il n'y a plus d'orpheline.
+  await maybeBackfillFollowUpTracking();
 
   // Relances automatiques (J+4/J+8) de la campagne, pour l'onglet Suivi
   const { data: followUps } = await supabase

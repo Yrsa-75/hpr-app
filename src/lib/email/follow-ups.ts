@@ -529,6 +529,35 @@ export async function backfillFollowUpTracking(supabase: any): Promise<FollowUpB
   return { orphans: orphans.length, matched, updated, pages, errors };
 }
 
+// Déclenchement opportuniste depuis la page campagne (constat du 2026-07-16 :
+// le cron Vercel avancé pour lancer le rattrapage n'a jamais tiré, Hobby ne
+// re-déclenche pas un cron déjà passé dans la journée). Quick-exit sur une
+// requête indexée quand il n'y a plus d'orpheline ; la garde évite les runs
+// concurrents dus à l'auto-refresh (30 s) de l'onglet Suivi.
+let backfillInFlight = false;
+
+export async function maybeBackfillFollowUpTracking(): Promise<void> {
+  if (backfillInFlight) return;
+  backfillInFlight = true;
+  try {
+    const { createServiceClient } = await import('@/lib/supabase/server');
+    const supabase = createServiceClient();
+    const result = await backfillFollowUpTracking(supabase);
+    if (result.orphans > 0) {
+      console.log(
+        `[follow-ups] Backfill via page: orphelines=${result.orphans}, matchées=${result.matched}, maj=${result.updated}, pages Resend=${result.pages}`
+      );
+      if (result.errors.length > 0) {
+        console.error('[follow-ups] Erreurs backfill via page:', result.errors);
+      }
+    }
+  } catch (err) {
+    console.error('[follow-ups] Backfill via page en échec:', err);
+  } finally {
+    backfillInFlight = false;
+  }
+}
+
 // ============================================
 // Point d'entrée (appelé par le cron batch-sender)
 // ============================================
