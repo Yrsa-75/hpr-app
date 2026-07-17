@@ -143,7 +143,7 @@ function MessageBubble({ message }: { message: EmailMessageRow }) {
       >
         {isInbound && message.body_html ? (
           <div
-            className="prose prose-invert prose-sm max-w-none text-sm"
+            className="prose prose-invert prose-sm max-w-none text-sm [&_*]:!text-foreground/90 [&_*]:!bg-transparent [&_a]:!text-hpr-gold [&_a]:underline"
             dangerouslySetInnerHTML={{ __html: message.body_html }}
           />
         ) : (
