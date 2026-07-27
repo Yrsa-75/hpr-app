@@ -3,7 +3,7 @@
 import * as React from 'react';
 import Link from 'next/link';
 import { useLocale, useTranslations } from 'next-intl';
-import { ArrowRight, Calendar, Mail, Eye, MessageSquare } from 'lucide-react';
+import { ArrowRight, Calendar, Mail, Eye, MessageSquare, Newspaper } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { CampaignRow } from '@/types/database';
 
@@ -92,7 +92,7 @@ export function CampaignCard({ campaign, clientId }: CampaignCardProps) {
         )}
 
         {/* Metrics */}
-        <div className="grid grid-cols-3 gap-2">
+        <div className="grid grid-cols-4 gap-2">
           <div className="flex flex-col items-center gap-0.5 bg-white/[0.02] rounded-lg p-2 border border-white/[0.04]">
             <Mail className="h-3 w-3 text-muted-foreground" />
             <span className="text-sm font-semibold text-foreground">{campaign.total_sent}</span>
@@ -107,6 +107,11 @@ export function CampaignCard({ campaign, clientId }: CampaignCardProps) {
             <MessageSquare className="h-3 w-3 text-muted-foreground" />
             <span className="text-sm font-semibold text-foreground">{campaign.total_replied}</span>
             <span className="text-[12px] text-muted-foreground/70">Réponses</span>
+          </div>
+          <div className="flex flex-col items-center gap-0.5 bg-white/[0.02] rounded-lg p-2 border border-white/[0.04]">
+            <Newspaper className="h-3 w-3 text-muted-foreground" />
+            <span className="text-sm font-semibold text-foreground">{campaign.total_publications ?? 0}</span>
+            <span className="text-[12px] text-muted-foreground/70">Retombées</span>
           </div>
         </div>
 
