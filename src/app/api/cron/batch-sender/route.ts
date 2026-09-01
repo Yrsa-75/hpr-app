@@ -1,7 +1,8 @@
 /**
  * Cron: Email Batch Sender
  * 1. Reprend les envois en attente (status='queued') pour toutes les campagnes actives.
- *    Limite à 100 emails par campagne par run (contrainte Resend plan gratuit).
+ *    Tout part en un seul run (compte Resend pro depuis le 2026-09-01, plus de
+ *    plafond quotidien) ; le débit est lissé dans processCampaignBatch.
  * 2. Planifie et envoie les relances automatiques J+4/J+8 aux non-répondants
  *    délivrés (l'envoi effectif requiert FOLLOW_UPS_AUTOSEND=true — cf. lib/email/follow-ups).
  * Planifié tous les jours à 9h dans vercel.json.
@@ -9,7 +10,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabase/server';
-import { processCampaignBatch, DAILY_BATCH_LIMIT } from '@/lib/email/send-batch';
+import { processCampaignBatch } from '@/lib/email/send-batch';
 import { runFollowUps, backfillFollowUpTracking } from '@/lib/email/follow-ups';
 
 export const runtime = 'nodejs';
@@ -47,7 +48,7 @@ export async function GET(req: NextRequest) {
     console.log(`[batch-sender] ${campaignIds.length} campagne(s) avec envois en attente.`);
 
     for (const campaignId of campaignIds) {
-      const result = await processCampaignBatch(supabase, campaignId, DAILY_BATCH_LIMIT);
+      const result = await processCampaignBatch(supabase, campaignId);
       results[campaignId] = { sent: result.sent, failed: result.failed, remaining: result.remaining };
       totalSent += result.sent;
       console.log(

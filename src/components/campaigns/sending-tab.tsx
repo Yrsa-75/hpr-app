@@ -42,7 +42,6 @@ const STATUS_CONFIG: Record<string, { label: string; color: string }> = {
 
 export function SendingTab({ campaignId, pressRelease, emailSends, client }: SendingTabProps) {
   const { toast } = useToast();
-  const BATCH_LIMIT = 100;
   const [isSending, setIsSending] = React.useState(false);
   const [result, setResult] = React.useState<{ sent: number; failed: number; remaining: number } | null>(null);
 
@@ -67,7 +66,7 @@ export function SendingTab({ campaignId, pressRelease, emailSends, client }: Sen
       if (res.success) {
         setResult({ sent: res.sent ?? 0, failed: res.failed ?? 0, remaining: res.remaining ?? 0 });
         const remainingMsg = (res.remaining ?? 0) > 0
-          ? ` ${res.remaining} restant${(res.remaining ?? 0) > 1 ? 's' : ''} — envoi automatique demain.`
+          ? ` ${res.remaining} restant${(res.remaining ?? 0) > 1 ? 's' : ''}, repris automatiquement par le cron quotidien.`
           : '';
         toast({
           title: 'Envoi terminé',
@@ -84,20 +83,6 @@ export function SendingTab({ campaignId, pressRelease, emailSends, client }: Sen
 
   return (
     <div className="space-y-6 py-4">
-      {/* Batching notice */}
-      {pendingCount > BATCH_LIMIT && (
-        <div className="flex items-start gap-3 rounded-xl border border-amber-500/20 bg-amber-500/5 px-4 py-3 text-xs text-amber-400">
-          <Clock className="h-4 w-4 flex-shrink-0 mt-0.5" />
-          <div>
-            <span className="font-medium">Envoi échelonné sur plusieurs jours</span>
-            <p className="mt-0.5 text-amber-400/70">
-              Votre campagne compte {pendingCount} journalistes. Les {BATCH_LIMIT} premiers seront envoyés maintenant,
-              les {pendingCount - BATCH_LIMIT} restants seront traités automatiquement (100 par jour à 9h).
-            </p>
-          </div>
-        </div>
-      )}
-
       {/* Checklist */}
       <div className="space-y-2">
         <h3 className="text-sm font-medium text-foreground">Vérification avant envoi</h3>
@@ -143,8 +128,6 @@ export function SendingTab({ campaignId, pressRelease, emailSends, client }: Sen
           <Send className="h-4 w-4" />
           {isSending
             ? 'Envoi en cours...'
-            : pendingCount > BATCH_LIMIT
-            ? `Envoyer les ${BATCH_LIMIT} premiers (${pendingCount} au total)`
             : `Envoyer à ${pendingCount} journaliste${pendingCount !== 1 ? 's' : ''}`}
         </Button>
         {result && (
@@ -158,7 +141,7 @@ export function SendingTab({ campaignId, pressRelease, emailSends, client }: Sen
             {result.remaining > 0 && (
               <p className="flex items-center gap-1.5 text-amber-400/80">
                 <Clock className="h-3 w-3" />
-                {result.remaining} restant{result.remaining !== 1 ? 's' : ''} — envoi automatique demain à 9h
+                {result.remaining} restant{result.remaining !== 1 ? 's' : ''} (envoi interrompu, repris automatiquement demain à 9h)
               </p>
             )}
           </div>

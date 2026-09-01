@@ -2,14 +2,14 @@
 
 import { revalidatePath } from 'next/cache';
 import { createClient } from '@/lib/supabase/server';
-import { processCampaignBatch, DAILY_BATCH_LIMIT } from '@/lib/email/send-batch';
+import { processCampaignBatch } from '@/lib/email/send-batch';
 
 export type SendCampaignResult = {
   success: boolean;
   error?: string;
   sent?: number;
   failed?: number;
-  /** Queued sends remaining after this batch (will be sent by the daily cron) */
+  /** Queued sends remaining after this batch (non-zero only if the batch was interrupted; the daily cron retries them) */
   remaining?: number;
   lastError?: string;
 };
@@ -30,7 +30,7 @@ export async function sendCampaignAction(
     .eq('campaign_id', campaignId)
     .eq('status', 'targeted');
 
-  const result = await processCampaignBatch(supabase, campaignId, DAILY_BATCH_LIMIT);
+  const result = await processCampaignBatch(supabase, campaignId);
 
   if (result.sent === 0 && result.failed === 0 && !result.lastError) {
     return { success: false, error: 'Aucun journaliste ciblé' };

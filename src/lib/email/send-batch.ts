@@ -3,7 +3,14 @@
  * Used by both the Server Action (user-triggered) and the daily cron job.
  */
 
-export const DAILY_BATCH_LIMIT = 100;
+// Compte Resend pro depuis le 2026-09-01 : plus de plafond quotidien, tout part
+// en un seul run. SEND_DELAY_MS lisse le débit sous la limite Resend (2 req/s) ;
+// un 429 résiduel est retenté avant d'interrompre le batch.
+const SEND_DELAY_MS = 600;
+const RATE_LIMIT_RETRIES = 3;
+const RATE_LIMIT_WAIT_MS = 1500;
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 /** Détecte les erreurs de rate limiting Resend (HTTP 429). */
 function isRateLimitError(err: unknown): boolean {
@@ -87,11 +94,11 @@ function buildEmailHtml({ intro, pr, mediaPackBlock, signature, unsubscribeUrl }
 }
 
 /**
- * Sends up to `limit` queued emails for a campaign (FIFO order).
+ * Sends every queued email for a campaign (FIFO order), or up to `limit` if provided.
  * Works with any Supabase client (user session or service role).
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-export async function processCampaignBatch(supabase: any, campaignId: string, limit = DAILY_BATCH_LIMIT): Promise<BatchResult> {
+export async function processCampaignBatch(supabase: any, campaignId: string, limit?: number): Promise<BatchResult> {
   // Fetch campaign + client sender info
   const { data: campaign } = await supabase
     .from('campaigns')
@@ -121,13 +128,14 @@ export async function processCampaignBatch(supabase: any, campaignId: string, li
   if (!totalQueued || totalQueued === 0) return { sent: 0, failed: 0, remaining: 0 };
 
   // Fetch the batch — oldest first (FIFO), joined with journalist + press_release
-  const { data: sends } = await supabase
+  let sendsQuery = supabase
     .from('email_sends')
     .select('*, journalists(first_name, last_name, email), press_releases(title, subtitle, body_html, email_subject)')
     .eq('campaign_id', campaignId)
     .eq('status', 'queued')
-    .order('created_at', { ascending: true })
-    .limit(limit);
+    .order('created_at', { ascending: true });
+  if (limit) sendsQuery = sendsQuery.limit(limit);
+  const { data: sends } = await sendsQuery;
 
   if (!sends || sends.length === 0) return { sent: 0, failed: 0, remaining: 0 };
 
@@ -184,7 +192,7 @@ export async function processCampaignBatch(supabase: any, campaignId: string, li
     const html = buildEmailHtml({ intro, pr, mediaPackBlock, signature, unsubscribeUrl });
 
     try {
-      const result = await resend.emails.send({
+      const payload = {
         from: `${fromName} <${fromEmail}>`,
         to: journalist.email,
         replyTo: `reply+${send.id}@${inboundDomain}`,
@@ -194,14 +202,20 @@ export async function processCampaignBatch(supabase: any, campaignId: string, li
           'X-Campaign-Id': campaignId,
           'X-Send-Id': send.id,
         },
-      });
+      };
+
+      let result = await resend.emails.send(payload);
+      for (let retry = 1; result.error && isRateLimitError(result.error) && retry <= RATE_LIMIT_RETRIES; retry++) {
+        await sleep(RATE_LIMIT_WAIT_MS * retry);
+        result = await resend.emails.send(payload);
+      }
 
       if (result.error) {
         if (isRateLimitError(result.error)) {
-          // Quota Resend atteint — on laisse cet email et les suivants en 'queued'
-          // Le cron du lendemain reprendra automatiquement
-          lastError = 'Quota Resend atteint (100/jour) — envoi reporté au lendemain';
-          console.warn('[HPR batch] Rate limit Resend atteint, arrêt du batch.', { sent, campaignId });
+          // 429 persistant malgré les retries : cet email et les suivants
+          // restent en 'queued', le cron quotidien reprendra automatiquement
+          lastError = 'Rate limit Resend persistant, reste en file, repris au prochain run';
+          console.warn('[HPR batch] Rate limit Resend persistant, arrêt du batch.', { sent, campaignId });
           break;
         }
         failed++;
@@ -218,7 +232,7 @@ export async function processCampaignBatch(supabase: any, campaignId: string, li
       }
     } catch (err: unknown) {
       if (isRateLimitError(err)) {
-        lastError = 'Quota Resend atteint (100/jour) — envoi reporté au lendemain';
+        lastError = 'Rate limit Resend (exception), reste en file, repris au prochain run';
         console.warn('[HPR batch] Rate limit Resend (exception), arrêt du batch.', { sent, campaignId });
         break;
       }
@@ -227,6 +241,8 @@ export async function processCampaignBatch(supabase: any, campaignId: string, li
       console.error('[HPR batch] Exception:', lastError, { to: journalist.email, from: fromEmail });
       await supabase.from('email_sends').update({ status: 'failed' }).eq('id', send.id);
     }
+
+    await sleep(SEND_DELAY_MS);
   }
 
   // Recalcule les restants après la boucle (couvre le cas d'un break en milieu de batch)

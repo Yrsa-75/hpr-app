@@ -17,7 +17,9 @@ import { cn } from '@/lib/utils';
 
 // Le rattrapage du tracking des relances peut prendre ~10-20 s au premier
 // chargement (défaut Hobby : 10 s, insuffisant)
-export const maxDuration = 60;
+// 300s (max Vercel Hobby) : sendCampaignAction envoie désormais toute la file
+// en un seul run (compte Resend pro), soit plusieurs minutes à ~1,6 email/s.
+export const maxDuration = 300;
 
 type CampaignStatus = CampaignRow['status'];
 
