@@ -8,6 +8,12 @@
  * Pas de runFollowUps ici : envois initiaux uniquement.
  *
  * Usage : npx tsx --env-file=.env.local --env-file=.env.batch.local scripts/run-batch-local-20260901.ts
+ *
+ * ISSUE RÉELLE DU 2026-09-01 : la RESEND_API_KEY de .env.local est invalide
+ * (constat déjà fait le 15/07, la clé valide n'existe que dans l'env Vercel).
+ * Le run local a marqué 220 envois 'failed' (remis en 'queued' via SQL), puis
+ * l'envoi a été déclenché avec succès via le bouton Envoi de l'app déployée
+ * (nouveau code sans limite). Ne pas relancer ce script sans clé locale valide.
  */
 
 import { createClient } from '@supabase/supabase-js';
