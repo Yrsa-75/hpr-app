@@ -15,9 +15,11 @@ export default async function InboxPage() {
 
   const { data: { user } } = await supabase.auth.getUser();
 
-  // Pull new emails from Resend and process them before rendering
+  // Pull new emails from Resend in background (non-blocking: this can take
+  // dozens of seconds and was freezing navigation to /inbox entirely).
+  // New emails appear on the next refresh, same pattern as monitorGoogleNews().
   if (user) {
-    await processInboundEmails();
+    processInboundEmails().catch(() => {});
   }
 
   let threads: ThreadWithJoins[] = [];

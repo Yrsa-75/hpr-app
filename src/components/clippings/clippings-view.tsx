@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/ui/use-toast';
 import { verifyClippingAction, deleteClippingAction } from '@/app/[locale]/(dashboard)/clippings/actions';
 import { ClippingAttribution } from '@/components/clippings/clipping-attribution';
+import { AddClippingDialog } from '@/components/clippings/add-clipping-dialog';
 import type { ClippingWithJoins } from '@/app/[locale]/(dashboard)/clippings/page';
 import type { ClientOption, CampaignOption } from '@/lib/clippings/attribution-options';
 
@@ -196,9 +197,12 @@ export function ClippingsView({ clippings, clientOptions, campaignOptions }: Cli
             Surveillance Google News automatique à chaque visite
           </p>
         </div>
-        <div className="text-right">
-          <p className="text-2xl font-bold font-display text-hpr-gold">{clippings.length}</p>
-          <p className="text-xs text-muted-foreground">retombées trouvées</p>
+        <div className="flex items-center gap-4">
+          <div className="text-right">
+            <p className="text-2xl font-bold font-display text-hpr-gold">{clippings.length}</p>
+            <p className="text-xs text-muted-foreground">retombées trouvées</p>
+          </div>
+          <AddClippingDialog clientOptions={clientOptions} campaignOptions={campaignOptions} />
         </div>
       </div>
 
