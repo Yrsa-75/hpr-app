@@ -12,6 +12,7 @@ import { useToast } from '@/components/ui/use-toast';
 
 export interface FollowUpLite {
   id: string;
+  email_send_id: string | null;
   sequence: number;
   status: 'scheduled' | 'sent' | 'cancelled';
   delivery_status: 'sent' | 'delivered' | 'opened' | 'clicked' | 'bounced' | 'complained' | null;
@@ -78,10 +79,24 @@ function StatCard({
 interface SendGroupProps {
   prId: string;
   sends: EmailSendWithJoins[];
+  followUps: FollowUpLite[];
   campaignId: string;
 }
 
-function SendGroup({ prId, sends, campaignId }: SendGroupProps) {
+// Date de la dernière relance envoyée pour chaque séquence (nº1 J+4, nº2 J+8)
+function lastFollowUpBySequence(followUps: FollowUpLite[]): { sequence: number; sentAt: string }[] {
+  const map = new Map<number, string>();
+  for (const f of followUps) {
+    if (f.status !== 'sent' || !f.sent_at) continue;
+    const prev = map.get(f.sequence);
+    if (!prev || f.sent_at > prev) map.set(f.sequence, f.sent_at);
+  }
+  return Array.from(map.entries())
+    .sort(([a], [b]) => a - b)
+    .map(([sequence, sentAt]) => ({ sequence, sentAt }));
+}
+
+function SendGroup({ prId, sends, followUps, campaignId }: SendGroupProps) {
   const router = useRouter();
   const { toast } = useToast();
   const [isDetailOpen, setIsDetailOpen] = React.useState(false);
@@ -94,6 +109,8 @@ function SendGroup({ prId, sends, campaignId }: SendGroupProps) {
   const total = sent.length;
   const prTitle = sends[0]?.press_releases?.title ?? 'Communiqué';
   const sentAt = sends.find((s) => s.sent_at)?.sent_at;
+  const lastFollowUps = lastFollowUpBySequence(followUps);
+  const scheduledFollowUps = followUps.filter((f) => f.status === 'scheduled').length;
 
   const counts = {
     opened: sent.filter((s) => s.opened_at != null || s.clicked_at != null).length,
@@ -179,6 +196,23 @@ function SendGroup({ prId, sends, campaignId }: SendGroupProps) {
               day: '2-digit', month: 'long', year: 'numeric',
               hour: '2-digit', minute: '2-digit',
             })} · {total} destinataire{total > 1 ? 's' : ''}
+          </p>
+        )}
+        {(lastFollowUps.length > 0 || scheduledFollowUps > 0) && (
+          <p className="text-xs text-muted-foreground/70 mt-0.5">
+            {lastFollowUps.map((lf, i) => (
+              <span key={lf.sequence}>
+                {i > 0 && ' · '}
+                Relance nº{lf.sequence} le{' '}
+                {new Date(lf.sentAt).toLocaleDateString('fr-FR', { day: '2-digit', month: 'long' })}
+              </span>
+            ))}
+            {scheduledFollowUps > 0 && (
+              <span className="text-amber-400">
+                {lastFollowUps.length > 0 && ' · '}
+                {scheduledFollowUps} relance{scheduledFollowUps > 1 ? 's' : ''} planifiée{scheduledFollowUps > 1 ? 's' : ''}
+              </span>
+            )}
           </p>
         )}
       </div>
@@ -353,6 +387,13 @@ function SendGroup({ prId, sends, campaignId }: SendGroupProps) {
           </div>
         </div>
       )}
+
+      {/* ── Relances de ce communiqué ── */}
+      {followUps.length > 0 && (
+        <div className="border-t border-white/[0.06]">
+          <FollowUpsSection followUps={followUps} embedded />
+        </div>
+      )}
     </div>
   );
 }
@@ -375,7 +416,16 @@ const followUpDeliveryConfig: Record<string, { label: string; color: string }> =
   complained: { label: 'Spam', color: 'text-red-400' },
 };
 
-function FollowUpsSection({ followUps }: { followUps: FollowUpLite[] }) {
+function FollowUpsSection({
+  followUps,
+  embedded = false,
+  title = 'Relances automatiques',
+}: {
+  followUps: FollowUpLite[];
+  // embedded : rendu à l'intérieur d'un bloc communiqué (sans cadre propre)
+  embedded?: boolean;
+  title?: string;
+}) {
   const [isDetailOpen, setIsDetailOpen] = React.useState(false);
 
   if (followUps.length === 0) return null;
@@ -393,9 +443,9 @@ function FollowUpsSection({ followUps }: { followUps: FollowUpLite[] }) {
   };
 
   return (
-    <div className="rounded-xl border border-white/[0.08] overflow-hidden">
-      <div className="px-4 py-3 bg-white/[0.02] border-b border-white/[0.06]">
-        <p className="text-sm font-medium text-foreground">Relances automatiques</p>
+    <div className={embedded ? '' : 'rounded-xl border border-white/[0.08] overflow-hidden'}>
+      <div className={`px-4 py-3 bg-white/[0.02] border-b border-white/[0.06] ${embedded ? 'bg-transparent border-b-0 pb-1' : ''}`}>
+        <p className={embedded ? 'text-xs font-medium text-foreground' : 'text-sm font-medium text-foreground'}>{title}</p>
         <p className="text-xs text-muted-foreground/70 mt-0.5">
           {counts.sent} envoyée{counts.sent > 1 ? 's' : ''}
           {counts.opened > 0 && <span className="text-emerald-400"> · {counts.opened} ouverte{counts.opened > 1 ? 's' : ''}</span>}
@@ -538,6 +588,25 @@ export function TrackingTab({ emailSends, followUps, campaignId }: TrackingTabPr
     });
   }, [emailSends]);
 
+  // Rattache chaque relance au bloc communiqué de son envoi d'origine
+  // (follow_ups.email_send_id). Les relances orphelines restent dans une
+  // section globale en bas de l'onglet.
+  const { followUpsByGroup, orphanFollowUps } = React.useMemo(() => {
+    const sendToGroup = new Map<string, string>();
+    for (const [groupKey, groupSends] of groups) {
+      for (const s of groupSends) sendToGroup.set(s.id, groupKey);
+    }
+    const byGroup = new Map<string, FollowUpLite[]>();
+    const orphans: FollowUpLite[] = [];
+    for (const f of followUps) {
+      const groupKey = f.email_send_id ? sendToGroup.get(f.email_send_id) : undefined;
+      if (!groupKey) { orphans.push(f); continue; }
+      if (!byGroup.has(groupKey)) byGroup.set(groupKey, []);
+      byGroup.get(groupKey)!.push(f);
+    }
+    return { followUpsByGroup: byGroup, orphanFollowUps: orphans };
+  }, [groups, followUps]);
+
   if (sent.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-20 text-center">
@@ -572,11 +641,17 @@ export function TrackingTab({ emailSends, followUps, campaignId }: TrackingTabPr
 
       {/* ── One accordion per send group ── */}
       {groups.map(([prId, groupSends]) => (
-        <SendGroup key={prId} prId={prId} sends={groupSends} campaignId={campaignId} />
+        <SendGroup
+          key={prId}
+          prId={prId}
+          sends={groupSends}
+          followUps={followUpsByGroup.get(prId) ?? []}
+          campaignId={campaignId}
+        />
       ))}
 
-      {/* ── Relances automatiques ── */}
-      <FollowUpsSection followUps={followUps} />
+      {/* ── Relances non rattachées à un envoi affiché ── */}
+      <FollowUpsSection followUps={orphanFollowUps} title="Autres relances automatiques" />
     </div>
   );
 }
