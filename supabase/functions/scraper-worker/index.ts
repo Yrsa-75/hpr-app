@@ -1,5 +1,5 @@
 // ============================================
-// HPR — scraper-worker Edge Function v13
+// HPR — scraper-worker Edge Function v14
 // Scraping autonome des médias français
 // Sources : HTML, RSS, Wikipedia, auteurs paginés, Twitter
 // Auto-amélioration :
@@ -15,6 +15,13 @@
 //   - prompt d'extraction durci : exclut les personnes citées/interviewées
 //     dans les articles (des pilotes de motocross avaient été pris pour
 //     des journalistes)
+// v14 (diagnostic 2026-10-12) :
+//   - CAUSE RACINE de la famine : getNextSources ne lisait que status =
+//     'pending', or markDone passe la source en 'done' (+30 j) et rien ne la
+//     repassait jamais en 'pending'. Le re-scrape mensuel n'a donc jamais
+//     tourné : 203 sources dormaient, ~0 nouveau journaliste depuis août.
+//     Désormais : pending OU done, dès que next_scrape_at est dépassé,
+//     les sources jamais scrapées / pending en premier.
 // ============================================
 
 import { createClient } from 'npm:@supabase/supabase-js@2';
@@ -118,9 +125,12 @@ async function getNextSources(limit: number): Promise<ScrapingSource[]> {
   const { data } = await supabase
     .from('scraping_sources')
     .select('id, media_name, media_domain, team_page_url, feed_url, media_type, category, source_type, source_params, email_pattern')
-    .eq('status', 'pending')
+    // v14 : 'done' redevient éligible dès que next_scrape_at est dépassé
+    // (avant, une source done n'était plus jamais relue).
+    .in('status', ['pending', 'done'])
     .eq('auto_disabled', false)
     .lte('next_scrape_at', new Date().toISOString())
+    .order('status', { ascending: false }) // 'pending' avant 'done'
     .order('priority', { ascending: true })
     .order('last_scraped_at', { ascending: true, nullsFirst: true })
     .limit(limit);

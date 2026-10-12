@@ -1,5 +1,5 @@
 // ============================================
-// HPR — source-discoverer Edge Function v3
+// HPR — source-discoverer Edge Function v4
 // Alimente en continu la base journalistes avec de nouvelles sources
 //
 // Deux modes :
@@ -15,6 +15,15 @@
 // sources ajoutées les 06-09/07 avaient toutes une homepage en guise de
 // team_page_url et n'étaient jamais candidates au mode fix
 // (consecutive_failures = 0).
+//
+// v4 (diagnostic 2026-10-12) :
+//   - discover : Claude ne recevait que les 80 premiers domaines connus
+//     (sur ~240) et re-proposait des médias déjà en base → ~1 source/semaine.
+//     Désormais la liste complète est envoyée, et un thème cible tourne
+//     chaque jour (sport, deux-roues, tech grand public, auto, etc.) ou se
+//     force via body.focus.
+//   - fix : les placeholders marqués 'fix-placeholder' n'étaient JAMAIS
+//     retentés. Désormais retentés après PLACEHOLDER_RETRY_DAYS jours.
 //
 // Cron :
 //   fix      → toutes les 6h
@@ -32,6 +41,28 @@ const FIX_BATCH = 8;        // sources en erreur à réparer par run
 const PLACEHOLDER_BATCH = 6; // sources "homepage placeholder" à réparer par run
 const DISCOVER_BATCH = 25;  // nouvelles sources à générer par run
 const FETCH_TIMEOUT_MS = 8000;
+const PLACEHOLDER_RETRY_DAYS = 14; // v4 : un placeholder échoué est retenté après ce délai
+
+// v4 : thèmes cibles du mode discover, un par jour (rotation sur le jour du mois)
+interface DiscoverFocus { key: string; label: string; categories: string }
+const DISCOVER_FOCUS: DiscoverFocus[] = [
+  { key: 'sport', label: 'Médias sport (football, cyclisme, running, sports mécaniques, outdoor, sites et magazines spécialisés, rubriques sport des grands quotidiens)', categories: 'sport | velo | outdoor' },
+  { key: 'deux-roues', label: 'Médias deux-roues : moto, scooter, vélo, VAE, mobilité urbaine, trottinette (magazines, pure players, blogs de référence)', categories: 'moto | velo | auto' },
+  { key: 'tech-grand-public', label: "Médias tech grand public et high-tech : smartphones, informatique, jeux vidéo, tutoriels, guides d'achat (type commentcamarche.net, journaldugeek.com, phonandroid.com)", categories: 'tech' },
+  { key: 'auto', label: 'Médias automobile et mobilité : essais, actualité, électrique, occasion', categories: 'auto' },
+  { key: 'specialise', label: 'Médias spécialisés (santé, droit, immobilier, RH, marketing, startups, environnement, culture)', categories: 'sante | droit | immobilier | rh | environnement | culture | economie' },
+  { key: 'regional', label: 'Médias régionaux et locaux solides (PQR, hebdos, radios et TV locales, pure players régionaux)', categories: 'regional' },
+  { key: 'general', label: 'Pure players digitaux sérieux, agences de presse, magazines grand public, radios et TV nationales', categories: 'general | politique | economie | tv_radio' },
+];
+
+function pickFocus(requested?: string): DiscoverFocus {
+  if (requested) {
+    const found = DISCOVER_FOCUS.find((f) => f.key === requested);
+    if (found) return found;
+  }
+  const day = new Date().getUTCDate();
+  return DISCOVER_FOCUS[day % DISCOVER_FOCUS.length];
+}
 
 // Détecte une team_page_url qui n'est qu'une page d'accueil (ex: https://site.fr/)
 const HOMEPAGE_RE = /^https?:\/\/[^/]+\/?$/;
@@ -203,18 +234,18 @@ interface NewSource {
   source_type: string;
 }
 
-async function discoverNewSources(existingDomains: string[]): Promise<NewSource[]> {
-  const knownList = existingDomains.slice(0, 80).join(', ');
+async function discoverNewSources(existingDomains: string[], focus: DiscoverFocus): Promise<NewSource[]> {
+  // v4 : liste COMPLÈTE des domaines connus (avant : slice(0, 80) → Claude
+  // re-proposait des médias déjà en base, tous filtrés ensuite).
+  const knownList = existingDomains.join(', ');
 
   const prompt = `Tu es un expert des médias français et de leurs sources numériques.
 
-Je gère déjà ces domaines de médias français : ${knownList}
+Je gère déjà ces domaines de médias français (NE PAS les reproposer, ni leurs sous-domaines) : ${knownList}
 
-Génère exactement ${DISCOVER_BATCH} médias français que je ne liste PAS encore, priorité aux :
-- Médias spécialisés (santé, droit, immobilier, RH, marketing, startups, environnement, culture)
-- Médias régionaux solides
-- Pure players digitaux sérieux
-- Agences de presse (AFP, etc.)
+THÈME DU JOUR : ${focus.label}.
+
+Génère exactement ${DISCOVER_BATCH} médias français de ce thème que je ne liste PAS encore. Privilégie les médias qui ont une rédaction identifiable (signatures d'articles, page équipe) et un flux RSS public.
 
 Pour chaque, UNIQUEMENT si tu es certain de l'URL :
 - media_name : nom du média
@@ -222,7 +253,7 @@ Pour chaque, UNIQUEMENT si tu es certain de l'URL :
 - team_page_url : URL de la page équipe/journalistes/auteurs
 - feed_url : URL du flux RSS/Atom (null si tu n'es pas sûr)
 - media_type : presse_ecrite | web | radio | tv | podcast | blog
-- category : tech | economie | politique | culture | science | sport | sante | droit | immobilier | rh | environnement | general | regional
+- category : de préférence ${focus.categories}, sinon tech | economie | politique | culture | science | sport | sante | droit | immobilier | rh | environnement | general | regional
 - source_type : rss | html
 
 Réponds UNIQUEMENT avec un tableau JSON valide (pas de markdown, pas de commentaires) :
@@ -261,7 +292,7 @@ Deno.serve(async (req) => {
     return new Response('Unauthorized', { status: 401 });
   }
 
-  let body: { mode?: string } = {};
+  let body: { mode?: string; focus?: string } = {};
   try {
     body = await req.json();
   } catch {
@@ -287,14 +318,17 @@ Deno.serve(async (req) => {
       // Sources "placeholder" : team_page_url = page d'accueil, jamais aucun
       // journaliste ajouté. Elles scrapent "avec succès" (0 trouvé) puis sont
       // parquées 30 jours — le mode fix doit les rattraper.
+      // v4 : un placeholder déjà tenté sans succès est retenté après
+      // PLACEHOLDER_RETRY_DAYS jours (avant : jamais).
+      const retryBefore = new Date(Date.now() - PLACEHOLDER_RETRY_DAYS * 86_400_000).toISOString();
       const { data: placeholderCandidates } = await supabase
         .from('scraping_sources')
-        .select('id, media_name, media_domain, team_page_url, error_message, feed_url, total_journalists_added')
+        .select('id, media_name, media_domain, team_page_url, error_message, feed_url, total_journalists_added, updated_at')
         .eq('auto_disabled', false)
         .eq('consecutive_failures', 0)
         .is('feed_url', null)
         .eq('total_journalists_added', 0)
-        .is('error_message', null) // exclut les placeholders déjà tentés sans succès
+        .or(`error_message.is.null,and(error_message.like.fix-placeholder*,updated_at.lt.${retryBefore})`)
         .order('created_at', { ascending: false })
         .limit(60);
 
@@ -363,7 +397,10 @@ Deno.serve(async (req) => {
 
       console.log(`[discover] ${existingDomains.length} domaines déjà connus`);
 
-      const suggestions = await discoverNewSources(existingDomains);
+      const focus = pickFocus(body.focus);
+      console.log(`[discover] thème du jour : ${focus.key}`);
+
+      const suggestions = await discoverNewSources(existingDomains, focus);
       console.log(`[discover] Claude a suggéré ${suggestions.length} nouvelles sources`);
 
       for (const s of suggestions) {
@@ -408,8 +445,8 @@ Deno.serve(async (req) => {
       return new Response(
         JSON.stringify({
           success: true,
-          message: `Discover terminé : ${stats.inserted} nouvelles sources ajoutées (${stats.discovered} suggérées, ${stats.tested} testées)`,
-          stats,
+          message: `Discover terminé (${focus.key}) : ${stats.inserted} nouvelles sources ajoutées (${stats.discovered} suggérées, ${stats.tested} testées)`,
+          stats: { ...stats, focus: focus.key },
         }),
         { status: 200, headers: { 'Content-Type': 'application/json' } }
       );
