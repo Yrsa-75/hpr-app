@@ -1,5 +1,5 @@
 // ============================================
-// HPR — source-discoverer Edge Function v5
+// HPR — source-discoverer Edge Function v6
 // Alimente en continu la base journalistes avec de nouvelles sources
 //
 // Deux modes :
@@ -29,6 +29,8 @@
 //     au parse et était avalé en silence. Désormais 4096 tokens en mode
 //     discover, récupération d'un tableau tronqué (objets complets
 //     seulement) et log explicite en cas d'échec de parse.
+// v6 : logs de diagnostic systématiques sur la réponse Claude (longueur,
+//     objets parsés, objets conservés), via console.log.
 //
 // Cron :
 //   fix      → toutes les 6h
@@ -267,18 +269,19 @@ Réponds UNIQUEMENT avec un tableau JSON valide (pas de markdown, pas de comment
   // v5 : 25 médias ≈ 2 500 tokens de sortie, 2048 tronquait le tableau
   const response = await callClaude(prompt, 4096);
   const raw = parseSourcesArray(response);
-  if (raw.length === 0) {
-    console.error(`[discover] réponse Claude non exploitable (${response.length} car.) : ${response.slice(0, 300)}`);
-    return [];
-  }
+  // v6 : diagnostic systématique (console.log, pas console.error)
+  console.log(`[discover] réponse Claude : ${response.length} car., ${raw.length} objets parsés, début : ${response.slice(0, 160).replace(/\s+/g, ' ')}`);
+  if (raw.length === 0) return [];
   const known = new Set(existingDomains.map((d) => d.replace(/^www\./, '').toLowerCase()));
-  return raw.filter(
+  const kept = raw.filter(
     (s) =>
       s.media_name &&
       s.media_domain &&
       (s.team_page_url || s.feed_url) &&
       !known.has(String(s.media_domain).replace(/^www\./, '').toLowerCase())
   );
+  console.log(`[discover] ${kept.length} objets conservés après filtre domaines connus`);
+  return kept;
 }
 
 // v5 : extrait un tableau JSON d'une réponse Claude, même entourée de
