@@ -322,7 +322,19 @@ SUGGESTIONS :
 
 Réponds UNIQUEMENT avec un objet JSON valide, sans texte autour ni balises markdown, avec exactement ces clés : global, accroche, lisibilite, structure, angle_media (entiers de 0 à 100) et suggestions (tableau de chaînes, éventuellement vide).`;
 
-    const userPrompt = `Communiqué à évaluer.
+    // Date du jour : sans elle, le modèle suppose une autre année et conteste
+    // à tort les dates d'actualité citées dans le communiqué.
+    const today = new Date().toLocaleDateString('fr-FR', {
+      timeZone: 'Europe/Paris',
+      weekday: 'long',
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric',
+    });
+
+    const userPrompt = `Date du jour : ${today}. Les dates citées dans le communiqué sont à juger par rapport à cette date, pas par rapport à tes connaissances.
+
+Communiqué à évaluer.
 
 TITRE : ${pr.title ?? ''}
 SOUS-TITRE : ${pr.subtitle ?? ''}
