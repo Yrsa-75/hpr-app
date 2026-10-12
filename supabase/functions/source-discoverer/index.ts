@@ -1,5 +1,5 @@
 // ============================================
-// HPR — source-discoverer Edge Function v6
+// HPR — source-discoverer Edge Function v7
 // Alimente en continu la base journalistes avec de nouvelles sources
 //
 // Deux modes :
@@ -31,6 +31,8 @@
 //     seulement) et log explicite en cas d'échec de parse.
 // v6 : logs de diagnostic systématiques sur la réponse Claude (longueur,
 //     objets parsés, objets conservés), via console.log.
+// v7 : une source insérée sans flux validé est toujours 'html' (Claude
+//     annonçait 'rss' sans feed_url → handleRss sur une page HTML).
 //
 // Cron :
 //   fix      → toutes les 6h
@@ -460,7 +462,7 @@ Deno.serve(async (req) => {
           feed_url: feedOk ? s.feed_url : null,
           media_type: s.media_type ?? 'web',
           category: s.category ?? 'general',
-          source_type: feedOk ? 'rss' : (s.source_type ?? 'html'),
+          source_type: feedOk ? 'rss' : 'html', // v7 : jamais 'rss' sans flux validé
           status: 'pending',
           priority: 2,
           next_scrape_at: new Date().toISOString(),
