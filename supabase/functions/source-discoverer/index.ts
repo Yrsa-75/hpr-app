@@ -1,5 +1,5 @@
 // ============================================
-// HPR — source-discoverer Edge Function v4
+// HPR — source-discoverer Edge Function v5
 // Alimente en continu la base journalistes avec de nouvelles sources
 //
 // Deux modes :
@@ -24,6 +24,11 @@
 //     force via body.focus.
 //   - fix : les placeholders marqués 'fix-placeholder' n'étaient JAMAIS
 //     retentés. Désormais retentés après PLACEHOLDER_RETRY_DAYS jours.
+// v5 (2026-10-12, même jour) : le 1er run v4 a renvoyé « 0 suggérées » :
+//     les 25 médias dépassaient max_tokens=2048, le JSON tronqué échouait
+//     au parse et était avalé en silence. Désormais 4096 tokens en mode
+//     discover, récupération d'un tableau tronqué (objets complets
+//     seulement) et log explicite en cas d'échec de parse.
 //
 // Cron :
 //   fix      → toutes les 6h
@@ -113,7 +118,7 @@ async function isValidPage(url: string): Promise<boolean> {
 // ============================================
 // Claude API
 // ============================================
-async function callClaude(prompt: string): Promise<string> {
+async function callClaude(prompt: string, maxTokens = 2048): Promise<string> {
   const res = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: {
@@ -123,7 +128,7 @@ async function callClaude(prompt: string): Promise<string> {
     },
     body: JSON.stringify({
       model: CLAUDE_MODEL,
-      max_tokens: 2048,
+      max_tokens: maxTokens,
       messages: [{ role: 'user', content: prompt }],
     }),
   });
@@ -259,22 +264,50 @@ Pour chaque, UNIQUEMENT si tu es certain de l'URL :
 Réponds UNIQUEMENT avec un tableau JSON valide (pas de markdown, pas de commentaires) :
 [{"media_name":"...","media_domain":"...","team_page_url":"...","feed_url":"...","media_type":"...","category":"...","source_type":"..."}]`;
 
-  const response = await callClaude(prompt);
-  const jsonMatch = response.match(/\[[\s\S]*\]/);
-  if (!jsonMatch) return [];
-
-  try {
-    const raw: NewSource[] = JSON.parse(jsonMatch[0]);
-    return raw.filter(
-      (s) =>
-        s.media_name &&
-        s.media_domain &&
-        (s.team_page_url || s.feed_url) &&
-        !existingDomains.includes(s.media_domain)
-    );
-  } catch {
+  // v5 : 25 médias ≈ 2 500 tokens de sortie, 2048 tronquait le tableau
+  const response = await callClaude(prompt, 4096);
+  const raw = parseSourcesArray(response);
+  if (raw.length === 0) {
+    console.error(`[discover] réponse Claude non exploitable (${response.length} car.) : ${response.slice(0, 300)}`);
     return [];
   }
+  const known = new Set(existingDomains.map((d) => d.replace(/^www\./, '').toLowerCase()));
+  return raw.filter(
+    (s) =>
+      s.media_name &&
+      s.media_domain &&
+      (s.team_page_url || s.feed_url) &&
+      !known.has(String(s.media_domain).replace(/^www\./, '').toLowerCase())
+  );
+}
+
+// v5 : extrait un tableau JSON d'une réponse Claude, même entourée de
+// ```json ``` ou tronquée (on garde les objets complets).
+function parseSourcesArray(text: string): NewSource[] {
+  const cleaned = text.replace(/```(?:json)?/gi, '').trim();
+  const start = cleaned.indexOf('[');
+  if (start < 0) return [];
+  const body = cleaned.slice(start);
+
+  const end = body.lastIndexOf(']');
+  if (end > 0) {
+    try {
+      const parsed = JSON.parse(body.slice(0, end + 1));
+      if (Array.isArray(parsed)) return parsed as NewSource[];
+    } catch { /* tronqué ou invalide : on tente la récupération */ }
+  }
+
+  // Récupération : couper après le dernier objet complet
+  const lastObj = body.lastIndexOf('}');
+  if (lastObj < 0) return [];
+  try {
+    const parsed = JSON.parse(body.slice(0, lastObj + 1) + ']');
+    if (Array.isArray(parsed)) {
+      console.log(`[discover] tableau JSON tronqué récupéré : ${parsed.length} objets`);
+      return parsed as NewSource[];
+    }
+  } catch { /* irrécupérable */ }
+  return [];
 }
 
 // ============================================
