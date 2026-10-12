@@ -1,11 +1,15 @@
 'use client';
 
 import * as React from 'react';
-import { Send, AlertCircle, CheckCircle2, XCircle, Mail, ChevronDown, ChevronUp, Clock } from 'lucide-react';
+import { Send, AlertCircle, CheckCircle2, XCircle, Mail, ChevronDown, ChevronUp, Clock, CalendarClock, Ban } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/ui/use-toast';
-import { sendCampaignAction } from '@/app/[locale]/(dashboard)/clients/[clientId]/campaigns/[campaignId]/sending-actions';
-import type { PressReleaseRow, EmailSendRow } from '@/types/database';
+import {
+  sendCampaignAction,
+  scheduleCampaignSendAction,
+  cancelScheduledSendAction,
+} from '@/app/[locale]/(dashboard)/clients/[clientId]/campaigns/[campaignId]/sending-actions';
+import type { PressReleaseRow, EmailSendRow, CampaignRow } from '@/types/database';
 
 interface ClientInfo {
   name: string;
@@ -24,9 +28,35 @@ export interface EmailSendWithJoins extends EmailSendRow {
 
 interface SendingTabProps {
   campaignId: string;
+  campaign: Pick<CampaignRow, 'scheduled_send_at' | 'scheduled_send_started_at'>;
   pressRelease: PressReleaseRow | null;
   emailSends: EmailSendWithJoins[];
   client: ClientInfo;
+}
+
+/** Valeur par défaut du sélecteur : demain 9h (heure locale du navigateur). */
+function defaultScheduleValue(): string {
+  const d = new Date();
+  d.setDate(d.getDate() + 1);
+  d.setHours(9, 0, 0, 0);
+  return toDatetimeLocal(d);
+}
+
+/** Formate une Date pour un <input type="datetime-local"> (heure locale). */
+function toDatetimeLocal(d: Date): string {
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+function formatParis(iso: string): string {
+  return new Date(iso).toLocaleString('fr-FR', {
+    timeZone: 'Europe/Paris',
+    weekday: 'long',
+    day: '2-digit',
+    month: 'long',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
 }
 
 const STATUS_CONFIG: Record<string, { label: string; color: string }> = {
@@ -40,10 +70,56 @@ const STATUS_CONFIG: Record<string, { label: string; color: string }> = {
   failed: { label: 'Échec', color: 'text-red-400' },
 };
 
-export function SendingTab({ campaignId, pressRelease, emailSends, client }: SendingTabProps) {
+export function SendingTab({ campaignId, campaign, pressRelease, emailSends, client }: SendingTabProps) {
   const { toast } = useToast();
   const [isSending, setIsSending] = React.useState(false);
   const [result, setResult] = React.useState<{ sent: number; failed: number; remaining: number } | null>(null);
+
+  // Programmation de l'envoi
+  const [scheduledAt, setScheduledAt] = React.useState<string | null>(
+    campaign.scheduled_send_at && !campaign.scheduled_send_started_at ? campaign.scheduled_send_at : null
+  );
+  const [scheduleInput, setScheduleInput] = React.useState<string>(defaultScheduleValue);
+  const [isScheduling, setIsScheduling] = React.useState(false);
+
+  const handleSchedule = async () => {
+    if (!canSend || !scheduleInput) return;
+    const when = new Date(scheduleInput); // interprété en heure locale du navigateur
+    if (Number.isNaN(when.getTime())) {
+      toast({ title: 'Date invalide', variant: 'destructive' });
+      return;
+    }
+    setIsScheduling(true);
+    try {
+      const res = await scheduleCampaignSendAction(campaignId, when.toISOString());
+      if (res.success && res.scheduledAt) {
+        setScheduledAt(res.scheduledAt);
+        toast({
+          title: 'Envoi programmé',
+          description: `${pendingCount} email${pendingCount > 1 ? 's' : ''} partiront le ${formatParis(res.scheduledAt)} (heure de Paris).`,
+        });
+      } else {
+        toast({ title: 'Erreur', description: res.error, variant: 'destructive' });
+      }
+    } finally {
+      setIsScheduling(false);
+    }
+  };
+
+  const handleCancelSchedule = async () => {
+    setIsScheduling(true);
+    try {
+      const res = await cancelScheduledSendAction(campaignId);
+      if (res.success) {
+        setScheduledAt(null);
+        toast({ title: 'Programmation annulée', description: 'Les contacts restent ciblés, rien ne partira.' });
+      } else {
+        toast({ title: 'Erreur', description: res.error, variant: 'destructive' });
+      }
+    } finally {
+      setIsScheduling(false);
+    }
+  };
 
   const targeted = emailSends.filter((s) => s.status === 'targeted');
   const queued = emailSends.filter((s) => s.status === 'queued');
@@ -64,6 +140,7 @@ export function SendingTab({ campaignId, pressRelease, emailSends, client }: Sen
     try {
       const res = await sendCampaignAction(campaignId, pressRelease!.id);
       if (res.success) {
+        setScheduledAt(null); // l'envoi immédiat rend la programmation caduque
         setResult({ sent: res.sent ?? 0, failed: res.failed ?? 0, remaining: res.remaining ?? 0 });
         const remainingMsg = (res.remaining ?? 0) > 0
           ? ` ${res.remaining} restant${(res.remaining ?? 0) > 1 ? 's' : ''}, repris automatiquement par le cron quotidien.`
@@ -117,18 +194,72 @@ export function SendingTab({ campaignId, pressRelease, emailSends, client }: Sen
         <EmailPreview pressRelease={pressRelease} client={client} />
       )}
 
+      {/* Programmation */}
+      <div className="rounded-xl border border-white/[0.08] bg-white/[0.02] p-4 space-y-3">
+        <h3 className="text-sm font-medium text-foreground flex items-center gap-2">
+          <CalendarClock className="h-4 w-4 text-muted-foreground" />
+          Programmer l&apos;envoi
+        </h3>
+
+        {scheduledAt ? (
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <p className="text-sm text-foreground">
+              <span className="text-hpr-gold">Envoi programmé</span> le {formatParis(scheduledAt)}{' '}
+              <span className="text-muted-foreground">(heure de Paris)</span>
+              <span className="block text-xs text-muted-foreground mt-0.5">
+                {pendingCount} journaliste{pendingCount !== 1 ? 's' : ''} recevront le communiqué automatiquement. Vous pouvez encore modifier le texte d&apos;ici là.
+              </span>
+            </p>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleCancelSchedule}
+              disabled={isScheduling}
+              className="gap-1.5 text-muted-foreground hover:text-red-400"
+            >
+              <Ban className="h-3.5 w-3.5" />
+              Annuler la programmation
+            </Button>
+          </div>
+        ) : (
+          <div className="flex flex-wrap items-end gap-3">
+            <label className="flex flex-col gap-1 text-xs text-muted-foreground">
+              Date et heure (heure de Paris)
+              <input
+                type="datetime-local"
+                value={scheduleInput}
+                min={toDatetimeLocal(new Date())}
+                onChange={(e) => setScheduleInput(e.target.value)}
+                className="h-9 rounded-md border border-white/[0.1] bg-background px-3 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-hpr-gold/50"
+              />
+            </label>
+            <Button
+              variant="outline"
+              onClick={handleSchedule}
+              disabled={!canSend || isScheduling || isSending || !scheduleInput}
+              className="gap-2"
+            >
+              <CalendarClock className="h-4 w-4" />
+              {isScheduling ? 'Programmation...' : `Programmer pour ${pendingCount} journaliste${pendingCount !== 1 ? 's' : ''}`}
+            </Button>
+          </div>
+        )}
+      </div>
+
       {/* Send button */}
       <div className="flex items-center gap-4">
         <Button
           variant="gold"
           onClick={handleSend}
-          disabled={!canSend || isSending}
+          disabled={!canSend || isSending || isScheduling}
           className="gap-2"
         >
           <Send className="h-4 w-4" />
           {isSending
             ? 'Envoi en cours...'
-            : `Envoyer à ${pendingCount} journaliste${pendingCount !== 1 ? 's' : ''}`}
+            : scheduledAt
+              ? `Envoyer maintenant sans attendre (${pendingCount})`
+              : `Envoyer maintenant à ${pendingCount} journaliste${pendingCount !== 1 ? 's' : ''}`}
         </Button>
         {result && (
           <div className="text-xs text-muted-foreground space-y-0.5">

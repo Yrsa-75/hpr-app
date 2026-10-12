@@ -451,6 +451,15 @@ export function PressReleaseEditor({ campaignId, initialPressRelease }: PressRel
           )}
         </div>
 
+        {/* Aucune suggestion : le communiqué est jugé prêt */}
+        {scores && scores.suggestions.length === 0 && (
+          <div className="border border-emerald-500/20 bg-emerald-950/20 rounded-xl p-4">
+            <p className="text-xs text-emerald-400 leading-relaxed">
+              Aucune modification recommandée : l&apos;IA n&apos;a relevé aucun défaut avéré dans ce communiqué.
+            </p>
+          </div>
+        )}
+
         {/* Suggestions panel */}
         {scores && scores.suggestions.length > 0 && (
           <div className="border border-white/[0.08] bg-white/[0.02] rounded-xl p-4 space-y-3">

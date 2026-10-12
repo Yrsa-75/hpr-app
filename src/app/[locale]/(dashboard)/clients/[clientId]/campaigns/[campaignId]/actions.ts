@@ -283,39 +283,62 @@ export async function analyzePressReleaseAction(
     const { default: Anthropic } = await import('@anthropic-ai/sdk');
     const anthropic = new Anthropic({ apiKey });
 
-    const prompt = `Tu es un expert en relations presse. Analyse ce communiqué et donne un score sur 100 pour chaque critère :
-1. Accroche (titre et premier paragraphe accrocheurs ?)
-2. Lisibilité (clarté, longueur des phrases, jargon)
-3. Structure (pyramide inversée, codes RP)
-4. Angle média (info réelle ou pub déguisée ?)
+    // Le corps enregistré par l'éditeur commence souvent par le titre et le
+    // sous-titre : on les retire pour ne pas les présenter trois fois à l'IA
+    // (elle signalait systématiquement une « répétition du titre »).
+    const bodyText = stripLeadingDuplicates(
+      htmlToStructuredText(pr.body_html ?? ''),
+      [pr.title, pr.subtitle]
+    );
 
-Communiqué :
-TITRE: ${pr.title}
-SOUS-TITRE: ${pr.subtitle ?? ''}
-CORPS: ${pr.body_html?.replace(/<[^>]+>/g, ' ').trim() ?? ''}
+    const systemPrompt = `Tu es un attaché de presse senior et ancien journaliste. Tu évalues des communiqués de presse rédigés pour des PME et marques françaises, destinés à des rédactions généralistes et spécialisées.
 
-Réponds UNIQUEMENT en JSON avec ce format exact :
-{
-  "global": 75,
-  "accroche": 80,
-  "lisibilite": 70,
-  "structure": 75,
-  "angle_media": 75,
-  "suggestions": [
-    "Suggestion concrète 1",
-    "Suggestion concrète 2",
-    "Suggestion concrète 3"
-  ]
-}`;
+GRILLE DE NOTATION (chaque critère sur 100, à appliquer honnêtement sur toute l'échelle) :
+- 95 à 100 : irréprochable, un journaliste pourrait le reprendre tel quel.
+- 85 à 94 : très bon, aucun défaut réel, au plus un détail de goût.
+- 70 à 84 : bon, un ou deux défauts précis qui méritent une retouche.
+- 50 à 69 : moyen, plusieurs défauts structurels ou un angle flou.
+- Moins de 50 : faible, à retravailler en profondeur.
+Un communiqué bien construit DOIT obtenir 85 ou plus. Ne te réfugie pas dans la zone 70 à 80 par prudence : note ce que tu vois.
+
+CRITÈRES :
+1. accroche : le titre et le premier paragraphe donnent-ils immédiatement l'information et l'envie de lire ?
+2. lisibilite : phrases claires, paragraphes aérés, jargon limité, longueur adaptée à un email.
+3. structure : information essentielle en premier, puis preuves, contexte, informations pratiques, contact.
+4. angle_media : y a-t-il une vraie information (actualité, chiffre, nouveauté, validation externe, calendrier) qu'une rédaction peut traiter ?
+global : note d'ensemble, cohérente avec les quatre critères.
+
+CE QUI N'EST PAS UN DÉFAUT (ne pas pénaliser, ne pas suggérer de le retirer) :
+- Les informations pratiques en fin de communiqué : prix, points de vente, disponibilité, contact presse, proposition d'échantillons ou d'interview. Elles sont attendues par les rédactions.
+- Un court passage sur l'histoire du fondateur ou de la marque quand il éclaire le produit.
+- Un intertitre ou un paragraphe de conclusion qui s'adresse directement aux rédactions.
+- Le nom de la marque ou du produit répété dans le texte.
+- Une mise en gras de chiffres ou de faits saillants.
+
+SUGGESTIONS :
+- Ne propose une suggestion que pour un défaut avéré qui fait perdre des points, en citant le passage concerné et en disant précisément quoi changer. Chaque suggestion doit être une instruction applicable telle quelle par un rédacteur.
+- Si le communiqué est bon, renvoie un tableau vide. Zéro suggestion est une réponse normale et attendue pour un bon texte.
+- Jamais plus de 4 suggestions. Pas de suggestion de style ou de goût personnel.
+
+Réponds UNIQUEMENT avec un objet JSON valide, sans texte autour ni balises markdown, avec exactement ces clés : global, accroche, lisibilite, structure, angle_media (entiers de 0 à 100) et suggestions (tableau de chaînes, éventuellement vide).`;
+
+    const userPrompt = `Communiqué à évaluer.
+
+TITRE : ${pr.title ?? ''}
+SOUS-TITRE : ${pr.subtitle ?? ''}
+
+CORPS :
+${bodyText}`;
 
     const message = await anthropic.messages.create({
-      model: 'claude-haiku-4-5-20251001',
-      max_tokens: 1024,
-      messages: [{ role: 'user', content: prompt }],
+      model: 'claude-opus-5',
+      max_tokens: 4096,
+      system: systemPrompt,
+      messages: [{ role: 'user', content: userPrompt }],
     });
 
-    const content = message.content[0];
-    if (content.type !== 'text') {
+    const content = message.content.find((block) => block.type === 'text');
+    if (!content || content.type !== 'text') {
       return { success: false, error: 'Réponse IA inattendue' };
     }
 
@@ -325,13 +348,27 @@ Réponds UNIQUEMENT en JSON avec ce format exact :
       return { success: false, error: 'Format de réponse IA invalide' };
     }
 
-    const scores = JSON.parse(jsonMatch[0]) as {
+    const parsed = JSON.parse(jsonMatch[0]) as Partial<{
       global: number;
       accroche: number;
       lisibilite: number;
       structure: number;
       angle_media: number;
-      suggestions: string[];
+      suggestions: unknown;
+    }>;
+
+    const clamp = (n: unknown): number =>
+      Math.max(0, Math.min(100, Math.round(typeof n === 'number' && Number.isFinite(n) ? n : 0)));
+
+    const scores = {
+      global: clamp(parsed.global),
+      accroche: clamp(parsed.accroche),
+      lisibilite: clamp(parsed.lisibilite),
+      structure: clamp(parsed.structure),
+      angle_media: clamp(parsed.angle_media),
+      suggestions: Array.isArray(parsed.suggestions)
+        ? parsed.suggestions.filter((s): s is string => typeof s === 'string' && s.trim().length > 0).slice(0, 4)
+        : [],
     };
 
     // Save scores to database
@@ -402,4 +439,74 @@ Réponds UNIQUEMENT avec le contenu réécrit, sans commentaire.`;
     const message = err instanceof Error ? err.message : 'Erreur inconnue';
     return { success: false, error: `Erreur IA : ${message}` };
   }
+}
+
+// ---------------------------------------------------------------------------
+// Helpers d'analyse IA (non exportés : ce fichier est un module 'use server')
+// ---------------------------------------------------------------------------
+
+/** Convertit le HTML de l'éditeur en texte structuré (paragraphes, intertitres, listes conservés). */
+function htmlToStructuredText(html: string): string {
+  const decode = (s: string) =>
+    s
+      .replace(/&nbsp;/gi, ' ')
+      .replace(/&amp;/gi, '&')
+      .replace(/&lt;/gi, '<')
+      .replace(/&gt;/gi, '>')
+      .replace(/&quot;/gi, '"')
+      .replace(/&#39;|&apos;/gi, "'")
+      .replace(/&#(\d+);/g, (_, code) => String.fromCharCode(Number(code)));
+
+  return decode(
+    html
+      .replace(/<(script|style)\b[^>]*>[\s\S]*?<\/\1>/gi, '')
+      .replace(/<h([1-6])\b[^>]*>([\s\S]*?)<\/h\1>/gi, (_, _lvl, inner) => `\n\n[Intertitre] ${inner}\n\n`)
+      .replace(/<li\b[^>]*>([\s\S]*?)<\/li>/gi, (_, inner) => `\n- ${inner}`)
+      .replace(/<\/(p|div|ul|ol|blockquote)>/gi, '\n\n')
+      .replace(/<br\s*\/?>/gi, '\n')
+      .replace(/<[^>]+>/g, '')
+  )
+    .replace(/[ \t]+/g, ' ')
+    .replace(/ *\n */g, '\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+
+function normalizeWords(s: string): string[] {
+  return s
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim()
+    .split(' ')
+    .filter((w) => w.length > 1);
+}
+
+/** Part des mots du paragraphe présents dans la référence (0 à 1). */
+function overlapRatio(paragraph: string, reference: string): number {
+  const p = normalizeWords(paragraph);
+  if (p.length === 0) return 0;
+  const ref = new Set(normalizeWords(reference));
+  const hits = p.filter((w) => ref.has(w)).length;
+  return hits / p.length;
+}
+
+/**
+ * Retire en tête du texte les paragraphes qui ne font que répéter le titre
+ * ou le sous-titre (l'éditeur les enregistre dans le corps).
+ */
+function stripLeadingDuplicates(text: string, references: Array<string | null | undefined>): string {
+  const refs = references.filter((r): r is string => !!r && r.trim().length > 0);
+  if (refs.length === 0) return text;
+
+  const paragraphs = text.split(/\n\s*\n/);
+  let dropped = 0;
+  while (dropped < paragraphs.length && dropped < refs.length + 1) {
+    const para = paragraphs[dropped];
+    const isDuplicate = refs.some((ref) => overlapRatio(para, ref) >= 0.8 && overlapRatio(ref, para) >= 0.6);
+    if (!isDuplicate) break;
+    dropped++;
+  }
+  return paragraphs.slice(dropped).join('\n\n');
 }

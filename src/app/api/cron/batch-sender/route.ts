@@ -1,31 +1,69 @@
 /**
  * Cron: Email Batch Sender
- * 1. Reprend les envois en attente (status='queued') pour toutes les campagnes actives.
+ *
+ * Mode par défaut (cron Vercel quotidien, 9h, vercel.json) :
+ * 1. Déclenche les envois programmés arrivés à échéance (filet de sécurité
+ *    si le déclencheur pg_cron n'a pas tourné).
+ * 2. Reprend les envois en attente (status='queued') pour toutes les campagnes.
  *    Tout part en un seul run (compte Resend pro depuis le 2026-09-01, plus de
  *    plafond quotidien) ; le débit est lissé dans processCampaignBatch.
- * 2. Planifie et envoie les relances automatiques J+4/J+8 aux non-répondants
- *    délivrés (l'envoi effectif requiert FOLLOW_UPS_AUTOSEND=true — cf. lib/email/follow-ups).
- * Planifié tous les jours à 9h dans vercel.json.
+ * 3. Planifie et envoie les relances automatiques J+4/J+8 aux non-répondants
+ *    délivrés (l'envoi effectif requiert FOLLOW_UPS_AUTOSEND=true).
+ *
+ * Mode `?mode=scheduled` (pg_cron Supabase toutes les 5 min, uniquement quand
+ * une campagne est due, cf. migration 019) : ne traite QUE les envois
+ * programmés arrivés à échéance. Le plan Vercel Hobby limite les crons à un
+ * passage par jour, d'où ce déclencheur externe pour respecter l'heure choisie.
+ *
+ * Auth : Bearer CRON_SECRET (cron Vercel), SCHEDULER_SECRET ou la clé service
+ * Supabase (pg_cron). Le mode scheduled est de toute façon idempotent : chaque
+ * campagne est réservée atomiquement avant envoi (processDueScheduledCampaigns).
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabase/server';
-import { processCampaignBatch } from '@/lib/email/send-batch';
+import { processCampaignBatch, processDueScheduledCampaigns } from '@/lib/email/send-batch';
 import { runFollowUps, backfillFollowUpTracking } from '@/lib/email/follow-ups';
 
 export const runtime = 'nodejs';
 export const maxDuration = 300;
 
-export async function GET(req: NextRequest) {
+function isAuthorized(req: NextRequest): boolean {
   const authHeader = req.headers.get('authorization');
-  const secret = process.env.CRON_SECRET;
-  if (secret && authHeader !== `Bearer ${secret}`) {
+  const accepted = [
+    process.env.CRON_SECRET,
+    process.env.SCHEDULER_SECRET,
+    process.env.SUPABASE_SERVICE_ROLE_KEY,
+  ].filter((s): s is string => !!s && s.length > 0);
+
+  // Aucun secret configuré : on reste permissif (comportement historique)
+  if (accepted.length === 0) return true;
+  return accepted.some((secret) => authHeader === `Bearer ${secret}`);
+}
+
+export async function GET(req: NextRequest) {
+  if (!isAuthorized(req)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
   const supabase = createServiceClient();
+  const mode = req.nextUrl.searchParams.get('mode') ?? 'daily';
 
-  // Trouver toutes les campagnes avec des envois en attente
+  // 1. Envoi programmé arrivé à échéance (dans les deux modes)
+  const scheduled = await processDueScheduledCampaigns(supabase);
+  if (scheduled.due > 0) {
+    console.log(`[batch-sender] Envois programmés : ${scheduled.started.length}/${scheduled.due} déclenché(s).`);
+  }
+
+  if (mode === 'scheduled') {
+    return NextResponse.json({
+      mode,
+      message: `Programmés : ${scheduled.started.length} campagne(s) déclenchée(s) sur ${scheduled.due} due(s)`,
+      scheduled,
+    });
+  }
+
+  // 2. Reprise des envois en attente (campagnes sans programmation future)
   const { data: queuedSends, error } = await supabase
     .from('email_sends')
     .select('campaign_id')
@@ -57,7 +95,7 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  // Relances automatiques J+4/J+8 (après les envois initiaux pour partager
+  // 3. Relances automatiques J+4/J+8 (après les envois initiaux pour partager
   // le quota Resend ; l'envoi effectif requiert FOLLOW_UPS_AUTOSEND=true)
   const followUps = await runFollowUps(supabase);
   console.log(
@@ -80,8 +118,10 @@ export async function GET(req: NextRequest) {
   }
 
   return NextResponse.json({
+    mode,
     message: `Batch terminé : ${totalSent} email${totalSent !== 1 ? 's' : ''} envoyé${totalSent !== 1 ? 's' : ''}, ${followUps.scheduled} relance${followUps.scheduled !== 1 ? 's' : ''} planifiée${followUps.scheduled !== 1 ? 's' : ''}, ${followUps.sent} envoyée${followUps.sent !== 1 ? 's' : ''}`,
     campaigns: campaignIds.length,
+    scheduled,
     results,
     followUps,
     backfill,

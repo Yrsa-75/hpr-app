@@ -264,3 +264,70 @@ export async function processCampaignBatch(supabase: any, campaignId: string, li
   return { sent, failed, remaining, lastError };
 }
 
+
+/**
+ * Envois programmés : réserve atomiquement chaque campagne due
+ * (scheduled_send_at <= now(), pas encore démarrée), passe ses contacts
+ * "targeted" en "queued" puis envoie. La réservation (UPDATE ... WHERE
+ * scheduled_send_started_at IS NULL) garantit qu'un appel concurrent ne
+ * déclenche jamais deux fois le même envoi.
+ */
+export type ScheduledRunResult = {
+  due: number;
+  started: string[];
+  results: Record<string, BatchResult>;
+};
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export async function processDueScheduledCampaigns(supabase: any): Promise<ScheduledRunResult> {
+  const nowIso = new Date().toISOString();
+
+  const { data: dueCampaigns, error } = await supabase
+    .from('campaigns')
+    .select('id, name, scheduled_send_at')
+    .not('scheduled_send_at', 'is', null)
+    .is('scheduled_send_started_at', null)
+    .lte('scheduled_send_at', nowIso)
+    .order('scheduled_send_at', { ascending: true });
+
+  if (error) {
+    console.error('[HPR scheduled] Erreur lecture campagnes dues:', error);
+    return { due: 0, started: [], results: {} };
+  }
+
+  const started: string[] = [];
+  const results: Record<string, BatchResult> = {};
+
+  for (const campaign of dueCampaigns ?? []) {
+    // Réservation atomique : un seul exécutant par campagne
+    const { data: claimed } = await supabase
+      .from('campaigns')
+      .update({ scheduled_send_started_at: nowIso, status: 'sending' })
+      .eq('id', campaign.id)
+      .is('scheduled_send_started_at', null)
+      .select('id');
+
+    if (!claimed || claimed.length === 0) continue;
+    started.push(campaign.id);
+
+    await supabase
+      .from('email_sends')
+      .update({ status: 'queued' })
+      .eq('campaign_id', campaign.id)
+      .eq('status', 'targeted');
+
+    const result = await processCampaignBatch(supabase, campaign.id);
+    results[campaign.id] = result;
+
+    // processCampaignBatch passe la campagne en 'active' s'il a envoyé ; sinon on ne la laisse pas en 'sending'
+    if (result.sent === 0) {
+      await supabase.from('campaigns').update({ status: 'draft' }).eq('id', campaign.id).eq('status', 'sending');
+    }
+
+    console.log(
+      `[HPR scheduled] Campagne ${campaign.name} (${campaign.id}) : envoyés=${result.sent}, échecs=${result.failed}, restants=${result.remaining}`
+    );
+  }
+
+  return { due: (dueCampaigns ?? []).length, started, results };
+}

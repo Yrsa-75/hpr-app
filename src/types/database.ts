@@ -318,6 +318,8 @@ export type Database = {
           keywords: string[] | null;
           target_date: string | null;
           embargo_until: string | null;
+          scheduled_send_at: string | null;
+          scheduled_send_started_at: string | null;
           total_sent: number;
           total_opened: number;
           total_clicked: number;
@@ -342,6 +344,8 @@ export type Database = {
           keywords?: string[] | null;
           target_date?: string | null;
           embargo_until?: string | null;
+          scheduled_send_at?: string | null;
+          scheduled_send_started_at?: string | null;
           total_sent?: number;
           total_opened?: number;
           total_clicked?: number;
@@ -366,6 +370,8 @@ export type Database = {
           keywords?: string[] | null;
           target_date?: string | null;
           embargo_until?: string | null;
+          scheduled_send_at?: string | null;
+          scheduled_send_started_at?: string | null;
           total_sent?: number;
           total_opened?: number;
           total_clicked?: number;

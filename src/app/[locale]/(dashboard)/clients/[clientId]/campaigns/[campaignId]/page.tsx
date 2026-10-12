@@ -261,6 +261,19 @@ export default async function CampaignDetailPage({
                   Date cible : {formattedDate}
                 </span>
               )}
+              {campaign.scheduled_send_at && !campaign.scheduled_send_started_at && (
+                <span className="flex items-center gap-1 text-hpr-gold">
+                  <Clock className="h-3 w-3" />
+                  Envoi programmé le{' '}
+                  {new Date(campaign.scheduled_send_at).toLocaleString('fr-FR', {
+                    timeZone: 'Europe/Paris',
+                    day: '2-digit',
+                    month: 'long',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                  })}
+                </span>
+              )}
               <span className="flex items-center gap-1">
                 <Clock className="h-3 w-3" />
                 Créé le{' '}

@@ -145,6 +145,7 @@ export function CampaignTabs({
       <TabsContent value="sending">
         <SendingTab
           campaignId={campaignId}
+          campaign={campaign}
           pressRelease={pressRelease}
           emailSends={emailSends}
           client={client}
